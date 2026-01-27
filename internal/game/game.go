@@ -43,6 +43,10 @@ const (
 	Cancelled
 )
 
+func (s Status) IsTerminal() bool {
+	return s != Active
+}
+
 // Kind identifies the type of game.
 type Kind string
 
@@ -78,12 +82,21 @@ func (p Position) InBounds(b Bounds) bool {
 
 // State holds the current state of a game session.
 type State[Shared any] struct {
-	// NextPlayer is the player whose turn it is.
-	NextPlayer Player
+	// CurrentPlayer is the player whose turn it is.
+	CurrentPlayer Player
 	// Status is the current game status.
 	Status Status
 	// Shared is the game-specific shared state.
 	Shared Shared
+}
+
+// NewState initializes the Game state object
+func NewState[Shared any](shared Shared) State[Shared] {
+	return State[Shared]{
+		CurrentPlayer: P1,
+		Status:        Active,
+		Shared:        shared,
+	}
 }
 
 // CanMakeMove validates that the specified player is allowed to make a move.
@@ -92,7 +105,7 @@ func (s State[Shared]) CanMakeMove(player Player) error {
 	if s.Status != Active {
 		return StateViolationError{"game is over"}
 	}
-	if player != s.NextPlayer {
+	if player != s.CurrentPlayer {
 		return StateViolationError{"not your turn"}
 	}
 	return nil
@@ -100,7 +113,7 @@ func (s State[Shared]) CanMakeMove(player Player) error {
 
 // Session defines the interface for a game session that can process moves.
 type Session[Move any, Shared any] interface {
-	MakeMove(Player, Move) (State[Shared], error)
+	MakeMove(State[Shared], Player, Move) (State[Shared], error)
 }
 
 // Ai defines the interface for an AI that can generate moves.

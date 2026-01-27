@@ -20,6 +20,8 @@ var lines = [8][3]Position{
 	{{0, 2}, {1, 1}, {2, 0}}, // bottom-left to top-right
 }
 
+var ticTacToeBounds = Bounds{Width: 3, Height: 3}
+
 // TicTacToeBoard is the shared state for a TicTacToe game.
 // Each cell is nil (empty) or points to the player who occupies it.
 type TicTacToeBoard struct {
@@ -27,7 +29,9 @@ type TicTacToeBoard struct {
 	Cells [3][3]*Player
 }
 
-var ticTacToeBounds = Bounds{Width: 3, Height: 3}
+func NewTicTacToeBoard() TicTacToeBoard {
+	return TicTacToeBoard{}
+}
 
 func (b TicTacToeBoard) countOccupiedBy(line [3]Position, player Player) int {
 	count := 0
@@ -82,52 +86,39 @@ func (b TicTacToeBoard) isFull() bool {
 }
 
 // TicTacToeSession implements GameSession for TicTacToe.
-type TicTacToeSession struct {
-	state State[TicTacToeBoard]
-}
-
-// NewTicTacToeSession creates a new TicTacToe game session.
-func NewTicTacToeSession() *TicTacToeSession {
-	return &TicTacToeSession{
-		state: State[TicTacToeBoard]{
-			NextPlayer: P1,
-			Status:     Active,
-			Shared:     TicTacToeBoard{},
-		},
-	}
-}
+type TicTacToeSession struct{}
 
 // MakeMove processes a move for the given player at the specified position.
-func (s *TicTacToeSession) MakeMove(player Player, move Position) (State[TicTacToeBoard], error) {
-	if err := s.state.CanMakeMove(player); err != nil {
-		return s.state, err
+func (s *TicTacToeSession) MakeMove(state State[TicTacToeBoard], player Player, move Position) (State[TicTacToeBoard], error) {
+	if err := state.CanMakeMove(player); err != nil {
+		return state, err
 	}
 	if !move.InBounds(ticTacToeBounds) {
-		return s.state, IllegalMoveError{"position out of bounds"}
+		return state, IllegalMoveError{"position out of bounds"}
 	}
-	if s.state.Shared.Cells[move.X][move.Y] != nil {
-		return s.state, IllegalMoveError{"cell is already occupied"}
+	if state.Shared.Cells[move.X][move.Y] != nil {
+		return state, IllegalMoveError{"cell is already occupied"}
 	}
 
 	// Place the player's mark
-	s.state.Shared.Cells[move.X][move.Y] = &player
+	state.Shared.Cells[move.X][move.Y] = &player
 
 	// Check for win
-	if s.state.Shared.checkWinFor(player) {
-		s.state.Status = player.Wins()
-		return s.state, nil
+	if state.Shared.checkWinFor(player) {
+		state.Status = player.Wins()
+		return state, nil
 	}
 
 	// Check for draw
-	if s.state.Shared.isFull() {
-		s.state.Status = Draw
-		return s.state, nil
+	if state.Shared.isFull() {
+		state.Status = Draw
+		return state, nil
 	}
 
 	// Switch to next player
-	s.state.NextPlayer = s.state.NextPlayer.Opponent()
+	state.CurrentPlayer = state.CurrentPlayer.Opponent()
 
-	return s.state, nil
+	return state, nil
 }
 
 // TicTacToeAi implements GameAi for TicTacToe.

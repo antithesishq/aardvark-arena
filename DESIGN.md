@@ -44,7 +44,7 @@ enum GameStatus {
 }
 
 type GameState[Shared any] struct {
-  NextPlayer Player
+  CurrentPlayer Player
   Status GameStatus
   Shared Shared
 }
@@ -214,7 +214,7 @@ Players must send HELLO immediately after connecting:
   Player -> Session: HELLO
   Session -> Player: STATE { GameState[Shared] }
 
-Players should submit moves whenever GameState.NextPlayer points at them. The server will respond with an Error _or_ broadcast the new game state to all players.
+Players should submit moves whenever GameState.CurrentPlayer points at them. The server will respond with an Error _or_ broadcast the new game state to all players.
 
   Player -> Session: MOVE { Move }
   Session -> Player: ERROR { InvalidMove }
