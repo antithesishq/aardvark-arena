@@ -48,10 +48,12 @@ const (
 	Cancelled
 )
 
+// In returns true if the status is one of the given statuses.
 func (s Status) In(statuses ...Status) bool {
 	return slices.Contains(statuses, s)
 }
 
+// IsTerminal returns true if the game has ended.
 func (s Status) IsTerminal() bool {
 	return s != Active
 }
@@ -99,7 +101,7 @@ type State[Shared any] struct {
 	Shared Shared
 }
 
-// NewState initializes the Game state object
+// NewState initializes the Game state object.
 func NewState[Shared any](shared Shared) State[Shared] {
 	return State[Shared]{
 		CurrentPlayer: P1,
@@ -136,10 +138,6 @@ type PlayerMap[V any] struct {
 	P2 V
 }
 
-func NewPlayerMap[V any](v V) PlayerMap[V] {
-	return PlayerMap[V]{P1: v, P2: v}
-}
-
 // Get retrieves the value for the specified player.
 func (pm PlayerMap[V]) Get(player Player) V {
 	if player == P1 {
@@ -157,7 +155,7 @@ func (pm *PlayerMap[V]) Set(player Player, value V) {
 	}
 }
 
-// Iterate yields each player and their associated value.
+// Iter yields each player and their associated value.
 func (pm *PlayerMap[V]) Iter() iter.Seq2[Player, V] {
 	return func(yield func(Player, V) bool) {
 		if !yield(P1, pm.P1) {

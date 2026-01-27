@@ -81,3 +81,24 @@ func TestBattleshipHarness(t *testing.T) {
 		}
 	})
 }
+
+// TestConnect4Harness verifies the harness works with Connect4.
+func TestConnect4Harness(t *testing.T) {
+	t.Run("Connect4 test", func(t *testing.T) {
+		initialState := NewState(NewConnect4Board())
+		session := &Connect4Session{}
+		ais := PlayerMap[Ai[int, Connect4Board]]{
+			P1: NewConnect4Ai(P1),
+			P2: NewConnect4Ai(P2),
+		}
+		finalState, err := RunGame(initialState, session, ais)
+
+		if err != nil {
+			t.Fatalf("game returned error: %v", err)
+		}
+
+		if !finalState.Status.In(P1Win, P2Win, Draw) {
+			t.Errorf("unexpected terminal status: %v", finalState.Status)
+		}
+	})
+}

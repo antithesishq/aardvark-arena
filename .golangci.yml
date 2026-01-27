@@ -3,3 +3,6 @@ linters:
   default: standard
   enable:
     - modernize
+    - godoclint
+    - godot
+    - revive

@@ -29,6 +29,7 @@ type TicTacToeBoard struct {
 	Cells [3][3]*Player
 }
 
+// NewTicTacToeBoard creates an empty TicTacToe board.
 func NewTicTacToeBoard() TicTacToeBoard {
 	return TicTacToeBoard{}
 }

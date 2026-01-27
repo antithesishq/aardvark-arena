@@ -5,12 +5,13 @@ import (
 	"slices"
 )
 
-// Battleship board dimensions
+// Battleship board dimensions.
 var battleshipBounds = Bounds{Width: 10, Height: 10}
 
 // ShipType identifies different ships in Battleship.
 type ShipType int
 
+// Ship types for Battleship.
 const (
 	Carrier        ShipType = iota
 	BattleshipShip          // Avoid collision with game.Battleship Kind
@@ -19,8 +20,8 @@ const (
 	Destroyer
 )
 
-// ShipSizes maps ship types to their lengths.
-var ShipSizes = map[ShipType]int{
+// shipSizes maps ship types to their lengths.
+var shipSizes = map[ShipType]int{
 	Carrier:        5,
 	BattleshipShip: 4,
 	Cruiser:        3,
@@ -28,15 +29,16 @@ var ShipSizes = map[ShipType]int{
 	Destroyer:      2,
 }
 
-// TotalShipCells is the sum of all ship sizes.
-const TotalShipCells = 5 + 4 + 3 + 3 + 2 // 17
+// totalShipCells is the sum of all ship sizes.
+const totalShipCells = 5 + 4 + 3 + 3 + 2 // 17
 
-// AllShipTypes is the ordered list of ships to place.
-var AllShipTypes = []ShipType{Carrier, BattleshipShip, Cruiser, Submarine, Destroyer}
+// allShipTypes is the ordered list of ships to place.
+var allShipTypes = []ShipType{Carrier, BattleshipShip, Cruiser, Submarine, Destroyer}
 
 // Orientation for ship placement.
 type Orientation int
 
+// Orientation values for ship placement.
 const (
 	Horizontal Orientation = iota
 	Vertical
@@ -51,7 +53,7 @@ type ShipPlacement struct {
 
 // positions returns all positions this ship occupies.
 func (p ShipPlacement) positions() []Position {
-	size := ShipSizes[p.Ship]
+	size := shipSizes[p.Ship]
 	result := make([]Position, size)
 	for i := range size {
 		if p.Orientation == Horizontal {
@@ -66,6 +68,7 @@ func (p ShipPlacement) positions() []Position {
 // BattleshipMoveKind discriminates setup vs attack moves.
 type BattleshipMoveKind int
 
+// Move kinds for Battleship.
 const (
 	SetupMoveKind BattleshipMoveKind = iota
 	AttackMoveKind
@@ -81,6 +84,7 @@ type BattleshipMove struct {
 // AttackResult represents the outcome of an attack at a position.
 type AttackResult int
 
+// Attack results.
 const (
 	Miss AttackResult = iota
 	Hit
@@ -131,13 +135,14 @@ func (s *BattleshipSession) MakeMove(state State[BattleshipSharedState], player 
 		return state, err
 	}
 
-	if s.InSetup() {
+	if s.inSetup() {
 		return s.handleSetup(state, player, move)
 	}
 	return s.handleAttack(state, player, move)
 }
 
-func (s *BattleshipSession) InSetup() bool {
+// inSetup returns true if the game is still in the setup phase.
+func (s *BattleshipSession) inSetup() bool {
 	return s.shipCells.P1 == nil || s.shipCells.P2 == nil
 }
 
@@ -152,7 +157,7 @@ func (s *BattleshipSession) handleSetup(state State[BattleshipSharedState], play
 
 	// Validate placements
 	providedShips := make(map[ShipType]bool)
-	occupied := make([]Position, TotalShipCells)
+	occupied := make([]Position, totalShipCells)
 	for _, placement := range move.Placements {
 		if providedShips[placement.Ship] {
 			return state, IllegalMoveError{"duplicate ship placement"}
@@ -170,7 +175,7 @@ func (s *BattleshipSession) handleSetup(state State[BattleshipSharedState], play
 	}
 
 	// Validate all required ships are provided exactly once
-	for _, ship := range AllShipTypes {
+	for _, ship := range allShipTypes {
 		if !providedShips[ship] {
 			return state, IllegalMoveError{"missing required ship"}
 		}
@@ -202,7 +207,7 @@ func (s *BattleshipSession) handleAttack(state State[BattleshipSharedState], pla
 	}
 
 	// Check for win (all opponent ship cells hit)
-	if state.Shared.hitCount(player) == TotalShipCells {
+	if state.Shared.hitCount(player) == totalShipCells {
 		state.Status = player.Wins()
 		return state, nil
 	}
@@ -231,20 +236,20 @@ func (ai *BattleshipAi) GetMove(state BattleshipSharedState) (BattleshipMove, er
 }
 
 func (ai *BattleshipAi) getSetupMove() (BattleshipMove, error) {
-	placements := make([]ShipPlacement, 0, len(AllShipTypes))
+	placements := make([]ShipPlacement, 0, len(allShipTypes))
 	occupied := make(map[Position]bool)
 
-	for _, ship := range AllShipTypes {
+	for _, ship := range allShipTypes {
 		placed := false
 		for attempts := 0; attempts < 1000 && !placed; attempts++ {
 			orientation := Orientation(rand.Intn(2))
 			var maxX, maxY int
 			if orientation == Horizontal {
-				maxX = battleshipBounds.Width - ShipSizes[ship]
+				maxX = battleshipBounds.Width - shipSizes[ship]
 				maxY = battleshipBounds.Height - 1
 			} else {
 				maxX = battleshipBounds.Width - 1
-				maxY = battleshipBounds.Height - ShipSizes[ship]
+				maxY = battleshipBounds.Height - shipSizes[ship]
 			}
 
 			if maxX < 0 || maxY < 0 {
