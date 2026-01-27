@@ -1,0 +1,329 @@
+package game
+
+import (
+	"math/rand"
+	"slices"
+)
+
+// Battleship board dimensions
+var battleshipBounds = Bounds{Width: 10, Height: 10}
+
+// ShipType identifies different ships in Battleship.
+type ShipType int
+
+const (
+	Carrier        ShipType = iota
+	BattleshipShip          // Avoid collision with game.Battleship Kind
+	Cruiser
+	Submarine
+	Destroyer
+)
+
+// ShipSizes maps ship types to their lengths.
+var ShipSizes = map[ShipType]int{
+	Carrier:        5,
+	BattleshipShip: 4,
+	Cruiser:        3,
+	Submarine:      3,
+	Destroyer:      2,
+}
+
+// TotalShipCells is the sum of all ship sizes.
+const TotalShipCells = 5 + 4 + 3 + 3 + 2 // 17
+
+// AllShipTypes is the ordered list of ships to place.
+var AllShipTypes = []ShipType{Carrier, BattleshipShip, Cruiser, Submarine, Destroyer}
+
+// Orientation for ship placement.
+type Orientation int
+
+const (
+	Horizontal Orientation = iota
+	Vertical
+)
+
+// ShipPlacement describes a single ship's position and orientation.
+type ShipPlacement struct {
+	Ship        ShipType
+	Position    Position
+	Orientation Orientation
+}
+
+// positions returns all positions this ship occupies.
+func (p ShipPlacement) positions() []Position {
+	size := ShipSizes[p.Ship]
+	result := make([]Position, size)
+	for i := range size {
+		if p.Orientation == Horizontal {
+			result[i] = Position{X: p.Position.X + i, Y: p.Position.Y}
+		} else {
+			result[i] = Position{X: p.Position.X, Y: p.Position.Y + i}
+		}
+	}
+	return result
+}
+
+// BattleshipMoveKind discriminates setup vs attack moves.
+type BattleshipMoveKind int
+
+const (
+	SetupMoveKind BattleshipMoveKind = iota
+	AttackMoveKind
+)
+
+// BattleshipMove is a tagged union for Battleship moves.
+type BattleshipMove struct {
+	Kind       BattleshipMoveKind
+	Placements []ShipPlacement // For SetupMoveKind
+	Target     Position        // For AttackMoveKind
+}
+
+// AttackResult represents the outcome of an attack at a position.
+type AttackResult int
+
+const (
+	Miss AttackResult = iota
+	Hit
+)
+
+// BattleshipSharedState is the game state visible to both players.
+type BattleshipSharedState struct {
+	// Attacks contains attacks made on each player.
+	// Maps position to result (Hit or Miss).
+	Attacks PlayerMap[map[Position]AttackResult]
+}
+
+// NewBattleshipSharedState creates initial shared state.
+func NewBattleshipSharedState() BattleshipSharedState {
+	return BattleshipSharedState{
+		Attacks: PlayerMap[map[Position]AttackResult]{
+			P1: make(map[Position]AttackResult),
+			P2: make(map[Position]AttackResult),
+		},
+	}
+}
+
+// hitCount returns how many hits a player has landed (on their opponent).
+func (s BattleshipSharedState) hitCount(player Player) int {
+	count := 0
+	for _, result := range s.Attacks.Get(player.Opponent()) {
+		if result == Hit {
+			count++
+		}
+	}
+	return count
+}
+
+// BattleshipSession keeps track of a Battleship game.
+type BattleshipSession struct {
+	// shipCells stores the set of cells occupied by each player's ships.
+	shipCells PlayerMap[[]Position]
+}
+
+// NewBattleshipSession creates a new session.
+func NewBattleshipSession() *BattleshipSession {
+	return &BattleshipSession{}
+}
+
+// MakeMove processes a move for the given player.
+func (s *BattleshipSession) MakeMove(state State[BattleshipSharedState], player Player, move BattleshipMove) (State[BattleshipSharedState], error) {
+	if err := state.CanMakeMove(player); err != nil {
+		return state, err
+	}
+
+	if s.InSetup() {
+		return s.handleSetup(state, player, move)
+	}
+	return s.handleAttack(state, player, move)
+}
+
+func (s *BattleshipSession) InSetup() bool {
+	return s.shipCells.P1 == nil || s.shipCells.P2 == nil
+}
+
+func (s *BattleshipSession) handleSetup(state State[BattleshipSharedState], player Player, move BattleshipMove) (State[BattleshipSharedState], error) {
+	if move.Kind != SetupMoveKind {
+		return state, IllegalMoveError{"must submit setup move during setup phase"}
+	}
+
+	if s.shipCells.Get(player) != nil {
+		return state, StateViolationError{"already completed setup"}
+	}
+
+	// Validate placements
+	providedShips := make(map[ShipType]bool)
+	occupied := make([]Position, TotalShipCells)
+	for _, placement := range move.Placements {
+		if providedShips[placement.Ship] {
+			return state, IllegalMoveError{"duplicate ship placement"}
+		}
+		providedShips[placement.Ship] = true
+		for _, pos := range placement.positions() {
+			if !pos.InBounds(battleshipBounds) {
+				return state, IllegalMoveError{"ship placement out of bounds"}
+			}
+			if slices.Contains(occupied, pos) {
+				return state, IllegalMoveError{"ships overlap"}
+			}
+			occupied = append(occupied, pos)
+		}
+	}
+
+	// Validate all required ships are provided exactly once
+	for _, ship := range AllShipTypes {
+		if !providedShips[ship] {
+			return state, IllegalMoveError{"missing required ship"}
+		}
+	}
+
+	// Store placements privately in session
+	s.shipCells.Set(player, occupied)
+
+	state.CurrentPlayer = state.CurrentPlayer.Opponent()
+	return state, nil
+}
+
+func (s *BattleshipSession) handleAttack(state State[BattleshipSharedState], player Player, move BattleshipMove) (State[BattleshipSharedState], error) {
+	if move.Kind != AttackMoveKind {
+		return state, IllegalMoveError{"must submit attack move after setup phase"}
+	}
+	if !move.Target.InBounds(battleshipBounds) {
+		return state, IllegalMoveError{"target out of bounds"}
+	}
+
+	// Check if hit or miss using private ship data
+	opponent := player.Opponent()
+	if slices.Contains(s.shipCells.Get(opponent), move.Target) {
+		state.Shared.Attacks.Get(opponent)[move.Target] = Hit
+	} else {
+		state.Shared.Attacks.Get(opponent)[move.Target] = Miss
+		// Switch turns on miss
+		state.CurrentPlayer = state.CurrentPlayer.Opponent()
+	}
+
+	// Check for win (all opponent ship cells hit)
+	if state.Shared.hitCount(player) == TotalShipCells {
+		state.Status = player.Wins()
+		return state, nil
+	}
+
+	return state, nil
+}
+
+// BattleshipAi implements Ai for Battleship.
+type BattleshipAi struct {
+	player Player
+	setup  bool
+}
+
+// NewBattleshipAi creates a new Battleship AI for the given player.
+func NewBattleshipAi(player Player) *BattleshipAi {
+	return &BattleshipAi{player: player}
+}
+
+// GetMove returns the AI's chosen move for the current state.
+func (ai *BattleshipAi) GetMove(state BattleshipSharedState) (BattleshipMove, error) {
+	if !ai.setup {
+		ai.setup = true
+		return ai.getSetupMove()
+	}
+	return ai.getAttackMove(state)
+}
+
+func (ai *BattleshipAi) getSetupMove() (BattleshipMove, error) {
+	placements := make([]ShipPlacement, 0, len(AllShipTypes))
+	occupied := make(map[Position]bool)
+
+	for _, ship := range AllShipTypes {
+		placed := false
+		for attempts := 0; attempts < 1000 && !placed; attempts++ {
+			orientation := Orientation(rand.Intn(2))
+			var maxX, maxY int
+			if orientation == Horizontal {
+				maxX = battleshipBounds.Width - ShipSizes[ship]
+				maxY = battleshipBounds.Height - 1
+			} else {
+				maxX = battleshipBounds.Width - 1
+				maxY = battleshipBounds.Height - ShipSizes[ship]
+			}
+
+			if maxX < 0 || maxY < 0 {
+				continue
+			}
+
+			pos := Position{X: rand.Intn(maxX + 1), Y: rand.Intn(maxY + 1)}
+			placement := ShipPlacement{Ship: ship, Position: pos, Orientation: orientation}
+
+			// Check no overlap with already placed ships
+			valid := true
+			positions := placement.positions()
+			for _, p := range positions {
+				if occupied[p] {
+					valid = false
+					break
+				}
+			}
+
+			if valid {
+				for _, p := range positions {
+					occupied[p] = true
+				}
+				placements = append(placements, placement)
+				placed = true
+			}
+		}
+
+		if !placed {
+			return BattleshipMove{}, StateViolationError{"failed to place ships"}
+		}
+	}
+
+	return BattleshipMove{Kind: SetupMoveKind, Placements: placements}, nil
+}
+
+func (ai *BattleshipAi) getAttackMove(state BattleshipSharedState) (BattleshipMove, error) {
+	// Attacks on the opponent represent our previous attacks
+	opponentBoard := state.Attacks.Get(ai.player.Opponent())
+
+	// First, look for untargeted cells adjacent to previous hits
+	adjacentOffsets := []Position{{X: 0, Y: -1}, {X: 0, Y: 1}, {X: -1, Y: 0}, {X: 1, Y: 0}}
+	var adjacentTargets []Position
+	for pos, result := range opponentBoard {
+		if result != Hit {
+			continue
+		}
+		for _, offset := range adjacentOffsets {
+			adj := Position{X: pos.X + offset.X, Y: pos.Y + offset.Y}
+			if !adj.InBounds(battleshipBounds) {
+				continue
+			}
+			if _, exists := opponentBoard[adj]; exists {
+				continue
+			}
+			adjacentTargets = append(adjacentTargets, adj)
+		}
+	}
+
+	if len(adjacentTargets) > 0 {
+		target := adjacentTargets[rand.Intn(len(adjacentTargets))]
+		return BattleshipMove{Kind: AttackMoveKind, Target: target}, nil
+	}
+
+	// Fall back to random targeting
+	var targets []Position
+	for x := range battleshipBounds.Width {
+		for y := range battleshipBounds.Height {
+			pos := Position{X: x, Y: y}
+			if _, exists := opponentBoard[pos]; !exists {
+				targets = append(targets, pos)
+			}
+		}
+	}
+
+	if len(targets) == 0 {
+		return BattleshipMove{}, StateViolationError{"no valid targets"}
+	}
+
+	target := targets[rand.Intn(len(targets))]
+	return BattleshipMove{Kind: AttackMoveKind, Target: target}, nil
+}

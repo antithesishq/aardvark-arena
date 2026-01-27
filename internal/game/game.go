@@ -1,6 +1,11 @@
 // Package game provides shared game types and logic.
 package game
 
+import (
+	"iter"
+	"slices"
+)
+
 // Player represents which player is acting.
 type Player int
 
@@ -42,6 +47,10 @@ const (
 	// Cancelled indicates the game was cancelled before completion.
 	Cancelled
 )
+
+func (s Status) In(statuses ...Status) bool {
+	return slices.Contains(statuses, s)
+}
 
 func (s Status) IsTerminal() bool {
 	return s != Active
@@ -119,4 +128,43 @@ type Session[Move any, Shared any] interface {
 // Ai defines the interface for an AI that can generate moves.
 type Ai[Move any, Shared any] interface {
 	GetMove(Shared) (Move, error)
+}
+
+// PlayerMap is a generic map-like structure for storing values per player.
+type PlayerMap[V any] struct {
+	P1 V
+	P2 V
+}
+
+func NewPlayerMap[V any](v V) PlayerMap[V] {
+	return PlayerMap[V]{P1: v, P2: v}
+}
+
+// Get retrieves the value for the specified player.
+func (pm PlayerMap[V]) Get(player Player) V {
+	if player == P1 {
+		return pm.P1
+	}
+	return pm.P2
+}
+
+// Set assigns the value for the specified player.
+func (pm *PlayerMap[V]) Set(player Player, value V) {
+	if player == P1 {
+		pm.P1 = value
+	} else {
+		pm.P2 = value
+	}
+}
+
+// Iterate yields each player and their associated value.
+func (pm *PlayerMap[V]) Iter() iter.Seq2[Player, V] {
+	return func(yield func(Player, V) bool) {
+		if !yield(P1, pm.P1) {
+			return
+		}
+		if !yield(P2, pm.P2) {
+			return
+		}
+	}
 }
