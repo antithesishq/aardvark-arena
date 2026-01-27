@@ -157,7 +157,7 @@ func (s *BattleshipSession) handleSetup(state State[BattleshipSharedState], play
 
 	// Validate placements
 	providedShips := make(map[ShipType]bool)
-	occupied := make([]Position, totalShipCells)
+	occupied := make([]Position, 0, totalShipCells)
 	for _, placement := range move.Placements {
 		if providedShips[placement.Ship] {
 			return state, IllegalMoveError{"duplicate ship placement"}
