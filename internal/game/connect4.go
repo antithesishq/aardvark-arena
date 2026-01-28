@@ -1,6 +1,7 @@
 package game
 
 import (
+	"fmt"
 	"math/rand"
 )
 
@@ -87,12 +88,12 @@ func (s *Connect4Session) MakeMove(state State[Connect4Board], player Player, co
 		return state, err
 	}
 	if col < 0 || col >= connect4Bounds.Width {
-		return state, IllegalMoveError{"column out of bounds"}
+		return state, fmt.Errorf("column out of bounds")
 	}
 
 	row := state.Shared.lowestEmpty(col)
 	if row < 0 {
-		return state, IllegalMoveError{"column is full"}
+		return state, fmt.Errorf("column is full")
 	}
 
 	// Place the piece
@@ -129,7 +130,7 @@ func NewConnect4Ai(player Player) *Connect4Ai {
 func (ai *Connect4Ai) GetMove(board Connect4Board) (int, error) {
 	validCols := board.validColumns()
 	if len(validCols) == 0 {
-		return 0, StateViolationError{"no valid moves available"}
+		return 0, fmt.Errorf("no valid moves available")
 	}
 
 	// Check for winning move

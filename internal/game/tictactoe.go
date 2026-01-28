@@ -1,6 +1,7 @@
 package game
 
 import (
+	"fmt"
 	"math/rand"
 )
 
@@ -95,10 +96,10 @@ func (s *TicTacToeSession) MakeMove(state State[TicTacToeBoard], player Player, 
 		return state, err
 	}
 	if !move.InBounds(ticTacToeBounds) {
-		return state, IllegalMoveError{"position out of bounds"}
+		return state, fmt.Errorf("position out of bounds")
 	}
 	if state.Shared.Cells[move.X][move.Y] != nil {
-		return state, IllegalMoveError{"cell is already occupied"}
+		return state, fmt.Errorf("cell is already occupied")
 	}
 
 	// Place the player's mark
@@ -158,7 +159,7 @@ func (ai *TicTacToeAi) GetMove(board TicTacToeBoard) (Position, error) {
 	// Play randomly
 	empties := board.empties()
 	if len(empties) == 0 {
-		return Position{}, StateViolationError{"no valid moves available"}
+		return Position{}, fmt.Errorf("no valid moves available")
 	}
 	return empties[rand.Intn(len(empties))], nil
 }

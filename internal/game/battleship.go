@@ -1,6 +1,7 @@
 package game
 
 import (
+	"fmt"
 	"math/rand"
 	"slices"
 )
@@ -148,11 +149,11 @@ func (s *BattleshipSession) inSetup() bool {
 
 func (s *BattleshipSession) handleSetup(state State[BattleshipSharedState], player Player, move BattleshipMove) (State[BattleshipSharedState], error) {
 	if move.Kind != SetupMoveKind {
-		return state, IllegalMoveError{"must submit setup move during setup phase"}
+		return state, fmt.Errorf("must submit setup move during setup phase")
 	}
 
 	if s.shipCells.Get(player) != nil {
-		return state, StateViolationError{"already completed setup"}
+		return state, fmt.Errorf("already completed setup")
 	}
 
 	// Validate placements
@@ -160,15 +161,15 @@ func (s *BattleshipSession) handleSetup(state State[BattleshipSharedState], play
 	occupied := make([]Position, 0, totalShipCells)
 	for _, placement := range move.Placements {
 		if providedShips[placement.Ship] {
-			return state, IllegalMoveError{"duplicate ship placement"}
+			return state, fmt.Errorf("duplicate ship placement")
 		}
 		providedShips[placement.Ship] = true
 		for _, pos := range placement.positions() {
 			if !pos.InBounds(battleshipBounds) {
-				return state, IllegalMoveError{"ship placement out of bounds"}
+				return state, fmt.Errorf("ship placement out of bounds")
 			}
 			if slices.Contains(occupied, pos) {
-				return state, IllegalMoveError{"ships overlap"}
+				return state, fmt.Errorf("ships overlap")
 			}
 			occupied = append(occupied, pos)
 		}
@@ -177,7 +178,7 @@ func (s *BattleshipSession) handleSetup(state State[BattleshipSharedState], play
 	// Validate all required ships are provided exactly once
 	for _, ship := range allShipTypes {
 		if !providedShips[ship] {
-			return state, IllegalMoveError{"missing required ship"}
+			return state, fmt.Errorf("missing required ship")
 		}
 	}
 
@@ -190,10 +191,10 @@ func (s *BattleshipSession) handleSetup(state State[BattleshipSharedState], play
 
 func (s *BattleshipSession) handleAttack(state State[BattleshipSharedState], player Player, move BattleshipMove) (State[BattleshipSharedState], error) {
 	if move.Kind != AttackMoveKind {
-		return state, IllegalMoveError{"must submit attack move after setup phase"}
+		return state, fmt.Errorf("must submit attack move after setup phase")
 	}
 	if !move.Target.InBounds(battleshipBounds) {
-		return state, IllegalMoveError{"target out of bounds"}
+		return state, fmt.Errorf("target out of bounds")
 	}
 
 	// Check if hit or miss using private ship data
@@ -279,7 +280,7 @@ func (ai *BattleshipAi) getSetupMove() (BattleshipMove, error) {
 		}
 
 		if !placed {
-			return BattleshipMove{}, StateViolationError{"failed to place ships"}
+			return BattleshipMove{}, fmt.Errorf("failed to place ships")
 		}
 	}
 
@@ -326,7 +327,7 @@ func (ai *BattleshipAi) getAttackMove(state BattleshipSharedState) (BattleshipMo
 	}
 
 	if len(targets) == 0 {
-		return BattleshipMove{}, StateViolationError{"no valid targets"}
+		return BattleshipMove{}, fmt.Errorf("no valid targets")
 	}
 
 	target := targets[rand.Intn(len(targets))]

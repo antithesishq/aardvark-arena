@@ -34,7 +34,7 @@ func TestCalcElo(t *testing.T) {
 		{
 			name:   "underdog wins",
 			winner: 800, loser: 1200, draw: false,
-			checkFunc: func(t *testing.T, newWinner, newLoser int) {
+			checkFunc: func(t *testing.T, newWinner, _ int) {
 				if newWinner <= 800 {
 					t.Errorf("underdog should increase, got %d", newWinner)
 				}
@@ -46,7 +46,7 @@ func TestCalcElo(t *testing.T) {
 		{
 			name:   "favorite wins",
 			winner: 1200, loser: 800, draw: false,
-			checkFunc: func(t *testing.T, newWinner, newLoser int) {
+			checkFunc: func(t *testing.T, newWinner, _ int) {
 				if newWinner <= 1200 {
 					t.Errorf("favorite should increase, got %d", newWinner)
 				}

@@ -2,6 +2,7 @@
 package game
 
 import (
+	"fmt"
 	"iter"
 	"slices"
 )
@@ -114,10 +115,10 @@ func NewState[Shared any](shared Shared) State[Shared] {
 // Returns an error if not.
 func (s State[Shared]) CanMakeMove(player Player) error {
 	if s.Status != Active {
-		return StateViolationError{"game is over"}
+		return fmt.Errorf("game is over")
 	}
 	if player != s.CurrentPlayer {
-		return StateViolationError{"not your turn"}
+		return fmt.Errorf("not your turn")
 	}
 	return nil
 }
