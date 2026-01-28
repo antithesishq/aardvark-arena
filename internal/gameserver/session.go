@@ -3,6 +3,7 @@ package gameserver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -12,6 +13,9 @@ import (
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 )
+
+// ErrMaxSessions is returned when the server has reached its maximum session capacity.
+var ErrMaxSessions = errors.New("max sessions reached")
 
 type SessionManager struct {
 	// mu protects reads/writes to the sessions map
@@ -30,9 +34,10 @@ func (s *SessionManager) CreateSession(sid internal.SessionID, game game.Kind, d
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// TODO enforce config.MaxSessions
-
 	if _, ok := s.sessions[sid]; !ok {
+		if len(s.sessions) >= s.config.MaxSessions {
+			return ErrMaxSessions
+		}
 		inboxCh := make(chan inboxMsg, 2)
 		ctx, cancel := context.WithCancel(context.Background())
 		handle := sessionHandle{

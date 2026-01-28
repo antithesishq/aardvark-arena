@@ -44,24 +44,34 @@ type Protocol[Move any, Shared any] struct {
 }
 
 func (p *Protocol[M, S]) RunToCompletion() {
-	// TODO send cancelled result when deadline triggers
+	timer := time.NewTimer(time.Until(p.deadline))
+	defer timer.Stop()
 
-	for msg := range p.inbox {
-		var err error
-		if msg.conn != nil && msg.move != nil {
-			panic("BUG: both move and conn are set")
-		} else if msg.conn != nil {
-			err = p.handleConn(msg.pid, msg.conn)
-		} else if msg.move != nil {
-			err = p.handleMove(msg.pid, msg.move)
-		}
-		if err != nil {
-			p.result <- resultMsg{err: err}
+	for {
+		select {
+		case <-timer.C:
+			p.result <- resultMsg{status: game.Cancelled}
 			return
-		}
-		if p.state.Status.IsTerminal() {
-			p.result <- resultMsg{status: p.state.Status}
-			return
+		case msg, ok := <-p.inbox:
+			if !ok {
+				return
+			}
+			var err error
+			if msg.conn != nil && msg.move != nil {
+				panic("BUG: both move and conn are set")
+			} else if msg.conn != nil {
+				err = p.handleConn(msg.pid, msg.conn)
+			} else if msg.move != nil {
+				err = p.handleMove(msg.pid, msg.move)
+			}
+			if err != nil {
+				p.result <- resultMsg{err: err}
+				return
+			}
+			if p.state.Status.IsTerminal() {
+				p.result <- resultMsg{status: p.state.Status}
+				return
+			}
 		}
 	}
 }
