@@ -2,12 +2,12 @@
 package gameserver
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"time"
 
 	"github.com/antithesishq/aardvark-arena/internal"
+	"github.com/coder/websocket"
 )
 
 // Config holds server configuration.
@@ -34,8 +34,8 @@ func New(cfg Config) *Server {
 
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET /health", s.handleHealth)
-	s.mux.HandleFunc("PUT /session/{sessionID}", s.handleCreateSession)
-	s.mux.HandleFunc("/session/{sessionID}/{playerID}", s.handleSessionConnect)
+	s.mux.HandleFunc("PUT /session/{sid}", s.handleCreateSession)
+	s.mux.HandleFunc("/session/{sid}/{pid}", s.handleSessionConnect)
 }
 
 // ListenAndServe starts the HTTP server.
@@ -57,33 +57,35 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
-	sessionID, err := internal.PathUUID(r, "sessionID")
+	sid, err := internal.PathUUID(r, "sid")
 	if err != nil {
 		internal.WriteError(w, http.StatusBadRequest, err)
 		return
 	}
 	// TODO: parse body { Game, Deadline }
 	// TODO: create session or return 503 if at capacity
-	log.Printf("create session: %s", sessionID)
+	log.Printf("create session: %s", sid)
 	w.WriteHeader(http.StatusOK)
 }
 
 func (s *Server) handleSessionConnect(w http.ResponseWriter, r *http.Request) {
-	sessionID, err := internal.PathUUID(r, "sessionID")
+	sid, err := internal.PathUUID(r, "sid")
 	if err != nil {
 		internal.WriteError(w, http.StatusBadRequest, err)
 		return
 	}
-	playerID, err := internal.PathUUID(r, "playerID")
+	pid, err := internal.PathUUID(r, "pid")
 	if err != nil {
 		internal.WriteError(w, http.StatusBadRequest, err)
+		return
+	}
+	conn, err := websocket.Accept(w, r, nil)
+	if err != nil {
+		log.Printf("websocket upgrade failed: %v", err)
 		return
 	}
 
-	// TODO: lookup session, fail if not exists
-	// TODO: upgrade to websocket
-	// TODO: handle HELLO, MOVE messages
-	// TODO: send STATE, ERROR, QUIT messages
-	log.Printf("player %s connecting to session %s", playerID, sessionID)
-	internal.WriteError(w, http.StatusNotImplemented, fmt.Errorf("not implemented"))
+	// TODO: connect websocket to session handle
+	log.Printf("player %s connecting to session %s", pid, sid)
+	_ = conn.Close(websocket.StatusNormalClosure, "not implemented")
 }

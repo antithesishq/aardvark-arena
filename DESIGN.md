@@ -172,6 +172,8 @@ The Gameserver's only job is to run game sessions. Each session is the backend i
 
 Each Gameserver runs up to a configurable number of sessions concurrently. Additional create session requests will be rejected with a `503 Service Unavailable`. The `Retry-After` header should be set to the time when the oldest session will timeout.
 
+When a Gameserver session completes, the Gameserver will attempt to report the result to the Matchmaker with retries. As this may fail, when Players rejoin the queue they may have to wait until the previous session times out on the Matchmaker, before they can receive a new match.
+
 ## Gameserver Configuration
 
 ```go
@@ -209,9 +211,8 @@ CONNECT /session/{SessionId}/{PlayerId}
 Players connect to Sessions via Websocket. Players may freely reconnect.
 
 ```
-Players must send HELLO immediately after connecting:
+Players receive state immediately after connecting:
 
-  Player -> Session: HELLO
   Session -> Player: STATE { GameState[Shared] }
 
 Players should submit moves whenever GameState.CurrentPlayer points at them. The server will respond with an Error _or_ broadcast the new game state to all players.
@@ -219,10 +220,6 @@ Players should submit moves whenever GameState.CurrentPlayer points at them. The
   Player -> Session: MOVE { Move }
   Session -> Player: ERROR { InvalidMove }
   Session => Players: STATE { GameState[Shared] }
-
-When the Session is complete, and the Gameserver has submitted the result to the Matchmaker, all connections will receive a QUIT message along with the final state. Game states will stick around in memory for a short amount of time before being GCed.
-
-  Session => Players: QUIT { GameState[Shared] }
 ```
 
 Players must disconnect once the Game status is terminal. Players may then rejoin the matchmaker queue.
