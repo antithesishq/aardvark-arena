@@ -3,7 +3,6 @@ package gameserver
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -15,7 +14,16 @@ import (
 )
 
 // ErrMaxSessions is returned when the server has reached its maximum session capacity.
-var ErrMaxSessions = errors.New("max sessions reached")
+type ErrMaxSessions struct {
+	RetryAt time.Time
+}
+
+func (e ErrMaxSessions) Error() string {
+	return "max session reached"
+}
+
+// https://stackoverflow.com/questions/25065055/what-is-the-maximum-time-time-in-go
+var maxTime = time.Unix(0, 0).Add(1<<63 - 1)
 
 // SessionManager manages active game sessions.
 type SessionManager struct {
@@ -37,6 +45,8 @@ func NewSessionManager(cfg Config) *SessionManager {
 
 // ActiveSessions returns the number of currently active sessions.
 func (s *SessionManager) ActiveSessions() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	return len(s.sessions)
 }
 
@@ -48,16 +58,24 @@ func (s *SessionManager) CreateSession(sid internal.SessionID, game game.Kind, d
 
 	if _, ok := s.sessions[sid]; !ok {
 		if len(s.sessions) >= s.cfg.MaxSessions {
-			return ErrMaxSessions
+			// find min deadline
+			var minDeadline = maxTime
+			for _, session := range s.sessions {
+				if !session.IsFinished() && session.deadline.Before(minDeadline) {
+					minDeadline = session.deadline
+				}
+			}
+			return &ErrMaxSessions{RetryAt: minDeadline}
 		}
 		inboxCh := make(chan inboxMsg, 2)
 		ctx, cancel := context.WithCancel(context.Background())
 		handle := sessionHandle{
-			ctx:    ctx,
-			cancel: cancel,
-			game:   game,
-			inbox:  inboxCh,
-			result: s.resultCh,
+			ctx:      ctx,
+			cancel:   cancel,
+			game:     game,
+			deadline: deadline,
+			inbox:    inboxCh,
+			result:   s.resultCh,
 		}
 		go handle.RunToCompletion(game, deadline)
 		s.sessions[sid] = handle
@@ -74,11 +92,12 @@ func (s *SessionManager) CreateSession(sid internal.SessionID, game game.Kind, d
 }
 
 type sessionHandle struct {
-	ctx    context.Context
-	cancel context.CancelFunc
-	game   game.Kind
-	inbox  chan inboxMsg
-	result chan resultMsg
+	ctx      context.Context
+	cancel   context.CancelFunc
+	game     game.Kind
+	deadline time.Time
+	inbox    chan inboxMsg
+	result   chan resultMsg
 }
 
 func (h *sessionHandle) IsFinished() bool {

@@ -2,7 +2,6 @@
 package gameserver
 
 import (
-	"errors"
 	"log"
 	"net/http"
 	"net/url"
@@ -85,7 +84,8 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	err = s.sessions.CreateSession(sid, body.Game, body.Deadline)
-	if errors.Is(err, ErrMaxSessions) {
+	if e, ok := err.(*ErrMaxSessions); ok {
+		w.Header().Add("Retry-After", e.RetryAt.Format(time.RFC1123))
 		internal.WriteError(w, http.StatusServiceUnavailable, err)
 		return
 	} else if err != nil {

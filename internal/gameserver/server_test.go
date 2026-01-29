@@ -35,12 +35,12 @@ func CheckHealth(t *testing.T, srv *Server, active int) HealthResponse {
 }
 
 func TestServerSanity(t *testing.T) {
-	srv := New(Config{
-		TurnTimeout: 30 * time.Second,
-		MaxSessions: 10,
-	})
 
 	t.Run("healthcheck", func(t *testing.T) {
+		srv := New(Config{
+			TurnTimeout: 30 * time.Second,
+			MaxSessions: 10,
+		})
 		health := CheckHealth(t, srv, 0)
 		if health.MaxSessions != 10 {
 			t.Errorf("expected MaxSessions=10, got %d", health.MaxSessions)
@@ -51,6 +51,10 @@ func TestServerSanity(t *testing.T) {
 	})
 
 	t.Run("create session", func(t *testing.T) {
+		srv := New(Config{
+			TurnTimeout: 30 * time.Second,
+			MaxSessions: 10,
+		})
 		sid := uuid.New()
 		body, err := internal.EncodeJSON(CreateSessionRequest{
 			Game:     game.TicTacToe,
@@ -68,6 +72,56 @@ func TestServerSanity(t *testing.T) {
 
 		if rec.Code != http.StatusOK {
 			t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+
+		CheckHealth(t, srv, 1)
+	})
+
+	t.Run("sessions full", func(t *testing.T) {
+		srv := New(Config{
+			TurnTimeout: 30 * time.Second,
+			MaxSessions: 1,
+		})
+
+		sid := uuid.New()
+		deadline := time.Now().Add(5 * time.Minute).Round(time.Second)
+		body, err := internal.EncodeJSON(CreateSessionRequest{
+			Game:     game.TicTacToe,
+			Deadline: deadline,
+		})
+		if err != nil {
+			t.Fatalf("failed to encode body: %v", err)
+		}
+
+		req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/session/%s", sid), body)
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		srv.ServeHTTP(rec, req)
+
+		// second request should fail due to MaxSessions
+		sid = uuid.New()
+		body, err = internal.EncodeJSON(CreateSessionRequest{
+			Game:     game.TicTacToe,
+			Deadline: time.Now().Add(5 * time.Minute),
+		})
+		if err != nil {
+			t.Fatalf("failed to encode body: %v", err)
+		}
+
+		req = httptest.NewRequest(http.MethodPut, fmt.Sprintf("/session/%s", sid), body)
+		req.Header.Set("Content-Type", "application/json")
+		rec = httptest.NewRecorder()
+		srv.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusServiceUnavailable {
+			t.Fatalf("expected status 503, got %d: %s", rec.Code, rec.Body.String())
+		}
+		retryAfter, err := time.Parse(time.RFC1123, rec.Header().Get("Retry-After"))
+		if err != nil {
+			t.Fatal("failed to parse retry-after")
+		}
+		if retryAfter != deadline {
+			t.Fatalf("incorrect retry-after deadline; got=%q; expected=%q", retryAfter, deadline)
 		}
 
 		CheckHealth(t, srv, 1)
