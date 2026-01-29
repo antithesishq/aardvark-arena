@@ -5,25 +5,33 @@ import (
 	"flag"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
 
+	"github.com/antithesishq/aardvark-arena/internal"
 	"github.com/antithesishq/aardvark-arena/internal/gameserver"
 )
 
 func main() {
 	log.SetOutput(os.Stdout)
 
-	addr := flag.String("addr", ":8080", "server listen address")
+	addr := flag.String("addr", ":8081", "server listen address")
 	turnTimeout := flag.Duration("turn-timeout", 30*time.Second, "max duration for a player to submit a move")
 	maxSessions := flag.Int("max-sessions", 100, "maximum concurrent sessions")
+	var apiKey internal.APIKey
+	flag.Var(&apiKey, "apikey", "API key for authenticating with matchmaker")
+	var matchmakerURL *url.URL
+	flag.Func("matchmaker-url", "matchmaker base URL", internal.URLParser(matchmakerURL))
 	flag.Parse()
 
 	log.Println("starting gameserver...")
 
 	cfg := gameserver.Config{
-		TurnTimeout: *turnTimeout,
-		MaxSessions: *maxSessions,
+		TurnTimeout:   *turnTimeout,
+		MaxSessions:   *maxSessions,
+		MatchmakerURL: matchmakerURL,
+		APIKey:        &apiKey,
 	}
 	srv := gameserver.New(cfg)
 	log.Printf("listening on %s", *addr)

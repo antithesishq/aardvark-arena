@@ -18,7 +18,20 @@ type PlayerID = uuid.UUID
 type SessionID = uuid.UUID
 
 // APIKey authenticates API requests.
-type APIKey = uuid.UUID
+type APIKey uuid.UUID
+
+func (f *APIKey) String() string {
+	return f.String()
+}
+
+func (f *APIKey) Set(val string) error {
+	parsed, err := uuid.Parse(val)
+	if err != nil {
+		return err
+	}
+	*f = APIKey(parsed)
+	return nil
+}
 
 // WriteError writes an error response with the given status code.
 func WriteError(w http.ResponseWriter, status int, err error) {

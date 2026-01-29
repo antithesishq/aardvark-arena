@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/antithesishq/aardvark-arena/internal"
@@ -14,12 +15,15 @@ import (
 
 // Config holds server configuration.
 type Config struct {
-	TurnTimeout time.Duration
-	MaxSessions int
+	TurnTimeout   time.Duration
+	MaxSessions   int
+	APIKey        *internal.APIKey
+	MatchmakerURL *url.URL
 }
 
 // Server manages game sessions.
 type Server struct {
+	cfg      Config
 	mux      *http.ServeMux
 	sessions *SessionManager
 }
@@ -27,6 +31,7 @@ type Server struct {
 // New creates a new Server.
 func New(cfg Config) *Server {
 	s := &Server{
+		cfg:      cfg,
 		mux:      http.NewServeMux(),
 		sessions: NewSessionManager(cfg),
 	}
@@ -54,8 +59,8 @@ type HealthResponse struct {
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	health := HealthResponse{
 		ActiveSessions: s.sessions.ActiveSessions(),
-		MaxSessions:    s.sessions.cfg.MaxSessions,
-		Full:           s.sessions.ActiveSessions() >= s.sessions.cfg.MaxSessions,
+		MaxSessions:    s.cfg.MaxSessions,
+		Full:           s.sessions.ActiveSessions() >= s.cfg.MaxSessions,
 	}
 	if err := internal.RespondJSON(w, health); err != nil {
 		internal.WriteError(w, http.StatusInternalServerError, err)
