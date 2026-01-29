@@ -2,11 +2,13 @@
 package gameserver
 
 import (
+	"errors"
 	"log"
 	"net/http"
 	"time"
 
 	"github.com/antithesishq/aardvark-arena/internal"
+	"github.com/antithesishq/aardvark-arena/internal/game"
 	"github.com/coder/websocket"
 )
 
@@ -18,15 +20,15 @@ type Config struct {
 
 // Server manages game sessions.
 type Server struct {
-	cfg Config
-	mux *http.ServeMux
+	mux      *http.ServeMux
+	sessions *SessionManager
 }
 
 // New creates a new Server.
 func New(cfg Config) *Server {
 	s := &Server{
-		cfg: cfg,
-		mux: http.NewServeMux(),
+		mux:      http.NewServeMux(),
+		sessions: NewSessionManager(cfg),
 	}
 	s.routes()
 	return s
@@ -48,9 +50,13 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	type Health struct {
 		ActiveSessions int
 		MaxSessions    int
+		Full           bool
 	}
-	health := Health{}
-	// TODO: set health stats
+	health := Health{
+		ActiveSessions: s.sessions.ActiveSessions(),
+		MaxSessions:    s.sessions.cfg.MaxSessions,
+		Full:           s.sessions.ActiveSessions() >= s.sessions.cfg.MaxSessions,
+	}
 	if err := internal.WriteJSON(w, health); err != nil {
 		internal.WriteError(w, http.StatusInternalServerError, err)
 	}
@@ -62,9 +68,24 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 		internal.WriteError(w, http.StatusBadRequest, err)
 		return
 	}
-	// TODO: parse body { Game, Deadline }
-	// TODO: create session or return 503 if at capacity
-	log.Printf("create session: %s", sid)
+	type Body struct {
+		Game     game.Kind
+		Deadline time.Time
+	}
+	body, err := internal.BindJSON[Body](r)
+	if err != nil {
+		internal.WriteError(w, http.StatusBadRequest, err)
+		return
+	}
+	err = s.sessions.CreateSession(sid, body.Game, body.Deadline)
+	if errors.Is(err, ErrMaxSessions) {
+		internal.WriteError(w, http.StatusServiceUnavailable, err)
+		return
+	} else if err != nil {
+		internal.WriteError(w, http.StatusInternalServerError, err)
+		return
+	}
+
 	w.WriteHeader(http.StatusOK)
 }
 

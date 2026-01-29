@@ -170,7 +170,7 @@ The Matchmaker checks the health of all Gameservers every second. If a Gameserve
 
 The Gameserver's only job is to run game sessions. Each session is the backend instance of a supported game. Sessions are created by the matchmaker, played by players, and then finally closed after notifying the matchmaker.
 
-Each Gameserver runs up to a configurable number of sessions concurrently. Additional create session requests will be rejected with a `503 Service Unavailable`. The `Retry-After` header should be set to the time when the oldest session will timeout.
+Each Gameserver runs up to a configurable number of sessions concurrently. Additional create session requests will be rejected with a `503 Service Unavailable`.
 
 When a Gameserver session completes, the Gameserver will attempt to report the result to the Matchmaker with retries. As this may fail, when Players rejoin the queue they may have to wait until the previous session times out on the Matchmaker, before they can receive a new match.
 

@@ -22,20 +22,29 @@ type SessionManager struct {
 	mu       sync.Mutex
 	sessions map[internal.SessionID]sessionHandle
 	resultCh chan resultMsg
-	config   Config
+	cfg      Config
+}
+
+func NewSessionManager(cfg Config) *SessionManager {
+	return &SessionManager{
+		sessions: make(map[internal.SessionID]sessionHandle),
+		resultCh: make(chan resultMsg, cfg.MaxSessions),
+		cfg:      cfg,
+	}
 }
 
 func (s *SessionManager) ActiveSessions() int {
 	return len(s.sessions)
 }
 
-// CreateSession idempotently creates a session, returning an error if the session is finished.
+// CreateSession idempotently creates a session, returning an error if the
+// session is finished.
 func (s *SessionManager) CreateSession(sid internal.SessionID, game game.Kind, deadline time.Time) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if _, ok := s.sessions[sid]; !ok {
-		if len(s.sessions) >= s.config.MaxSessions {
+		if len(s.sessions) >= s.cfg.MaxSessions {
 			return ErrMaxSessions
 		}
 		inboxCh := make(chan inboxMsg, 2)
