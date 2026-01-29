@@ -4,6 +4,7 @@ package main
 import (
 	"flag"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
@@ -25,7 +26,8 @@ func main() {
 		MaxSessions: *maxSessions,
 	}
 	srv := gameserver.New(cfg)
-	if err := srv.ListenAndServe(*addr); err != nil {
+	log.Printf("listening on %s", *addr)
+	if err := http.ListenAndServe(*addr, srv); err != nil {
 		log.Fatalf("server error: %v", err)
 	}
 }

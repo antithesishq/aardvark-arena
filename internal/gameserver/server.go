@@ -40,26 +40,30 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/session/{sid}/{pid}", s.handleSessionConnect)
 }
 
-// ListenAndServe starts the HTTP server.
-func (s *Server) ListenAndServe(addr string) error {
-	log.Printf("listening on %s", addr)
-	return http.ListenAndServe(addr, s.mux)
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.mux.ServeHTTP(w, r)
+}
+
+type HealthResponse struct {
+	ActiveSessions int
+	MaxSessions    int
+	Full           bool
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
-	type Health struct {
-		ActiveSessions int
-		MaxSessions    int
-		Full           bool
-	}
-	health := Health{
+	health := HealthResponse{
 		ActiveSessions: s.sessions.ActiveSessions(),
 		MaxSessions:    s.sessions.cfg.MaxSessions,
 		Full:           s.sessions.ActiveSessions() >= s.sessions.cfg.MaxSessions,
 	}
-	if err := internal.WriteJSON(w, health); err != nil {
+	if err := internal.RespondJSON(w, health); err != nil {
 		internal.WriteError(w, http.StatusInternalServerError, err)
 	}
+}
+
+type CreateSessionRequest struct {
+	Game     game.Kind
+	Deadline time.Time
 }
 
 func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
@@ -68,11 +72,7 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 		internal.WriteError(w, http.StatusBadRequest, err)
 		return
 	}
-	type Body struct {
-		Game     game.Kind
-		Deadline time.Time
-	}
-	body, err := internal.BindJSON[Body](r)
+	body, err := internal.BindJSON[CreateSessionRequest](r.Body)
 	if err != nil {
 		internal.WriteError(w, http.StatusBadRequest, err)
 		return
