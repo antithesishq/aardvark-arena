@@ -17,6 +17,7 @@ import (
 // ErrMaxSessions is returned when the server has reached its maximum session capacity.
 var ErrMaxSessions = errors.New("max sessions reached")
 
+// SessionManager manages active game sessions.
 type SessionManager struct {
 	// mu protects reads/writes to the sessions map
 	mu       sync.Mutex
@@ -25,6 +26,7 @@ type SessionManager struct {
 	cfg      Config
 }
 
+// NewSessionManager creates a new SessionManager with the given config.
 func NewSessionManager(cfg Config) *SessionManager {
 	return &SessionManager{
 		sessions: make(map[internal.SessionID]sessionHandle),
@@ -33,6 +35,7 @@ func NewSessionManager(cfg Config) *SessionManager {
 	}
 }
 
+// ActiveSessions returns the number of currently active sessions.
 func (s *SessionManager) ActiveSessions() int {
 	return len(s.sessions)
 }
@@ -87,7 +90,7 @@ func (h *sessionHandle) IsFinished() bool {
 	}
 }
 
-// Starts a goroutine
+// Starts a goroutine.
 func (h *sessionHandle) RunToCompletion(g game.Kind, deadline time.Time) {
 	defer h.cancel()
 
@@ -127,7 +130,7 @@ func (h *sessionHandle) RunToCompletion(g game.Kind, deadline time.Time) {
 	}
 }
 
-// Join a player to a session
+// Join a player to a session.
 func (h *sessionHandle) Join(pid internal.PlayerID, conn *websocket.Conn) {
 	// Send connection request to session protocol.
 	stateCh := make(chan StateOrErr, 1)

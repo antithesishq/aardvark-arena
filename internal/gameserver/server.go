@@ -44,6 +44,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.mux.ServeHTTP(w, r)
 }
 
+// HealthResponse contains the server health status.
 type HealthResponse struct {
 	ActiveSessions int
 	MaxSessions    int
@@ -61,6 +62,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	}
 }
 
+// CreateSessionRequest is the request body for creating a new game session.
 type CreateSessionRequest struct {
 	Game     game.Kind
 	Deadline time.Time

@@ -9,6 +9,7 @@ import (
 	"github.com/antithesishq/aardvark-arena/internal/game"
 )
 
+// StateOrErr holds either a game state or an error message.
 type StateOrErr struct {
 	State json.RawMessage
 	Error string
@@ -33,6 +34,7 @@ type resultMsg struct {
 	status game.Status // the final status of the game
 }
 
+// Protocol handles the game session communication protocol.
 type Protocol[Move any, Shared any] struct {
 	inbox  <-chan inboxMsg
 	result chan<- resultMsg
@@ -43,6 +45,7 @@ type Protocol[Move any, Shared any] struct {
 	session  game.Session[Move, Shared]
 }
 
+// RunToCompletion runs the game session until it ends or the deadline is reached.
 func (p *Protocol[M, S]) RunToCompletion() {
 	timer := time.NewTimer(time.Until(p.deadline))
 	defer timer.Stop()
@@ -125,6 +128,7 @@ func (p *Protocol[M, S]) handleMove(pid internal.PlayerID, rawMove json.RawMessa
 	return nil
 }
 
+// TrySend attempts to send a message to a player if they are connected.
 func (p *Protocol[M, S]) TrySend(pid internal.PlayerID, msg StateOrErr) {
 	playerConn, ok := p.players[pid]
 	if ok {
@@ -132,6 +136,7 @@ func (p *Protocol[M, S]) TrySend(pid internal.PlayerID, msg StateOrErr) {
 	}
 }
 
+// BroadcastState sends the current game state to all connected players.
 func (p *Protocol[M, S]) BroadcastState() error {
 	for pid := range p.players {
 		if err := p.SendState(pid); err != nil {
@@ -141,6 +146,7 @@ func (p *Protocol[M, S]) BroadcastState() error {
 	return nil
 }
 
+// SendState sends the current game state to a specific player.
 func (p *Protocol[M, S]) SendState(pid internal.PlayerID) error {
 	encodedState, err := json.Marshal(p.state)
 	if err != nil {
@@ -150,6 +156,7 @@ func (p *Protocol[M, S]) SendState(pid internal.PlayerID) error {
 	return nil
 }
 
+// SendErr sends an error message to a specific player.
 func (p *Protocol[M, S]) SendErr(pid internal.PlayerID, err error) {
 	p.TrySend(pid, StateOrErr{Error: err.Error()})
 }

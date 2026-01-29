@@ -71,10 +71,12 @@ const (
 	Connect4 Kind = "connect4"
 )
 
+// MarshalText implements encoding.TextMarshaler.
 func (k Kind) MarshalText() ([]byte, error) {
 	return []byte(k), nil
 }
 
+// UnmarshalText implements encoding.TextUnmarshaler.
 func (k *Kind) UnmarshalText(raw []byte) error {
 	unverified := Kind(raw)
 	switch unverified {

@@ -2,6 +2,7 @@ package internal
 
 import "math"
 
+// ELO rating constants.
 const (
 	DefaultElo        = 1000
 	KFactor           = 32
