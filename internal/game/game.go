@@ -71,6 +71,21 @@ const (
 	Connect4 Kind = "connect4"
 )
 
+func (k Kind) MarshalText() ([]byte, error) {
+	return []byte(k), nil
+}
+
+func (k *Kind) UnmarshalText(raw []byte) error {
+	unverified := Kind(raw)
+	switch unverified {
+	case Battleship, TicTacToe, Connect4:
+		*k = unverified
+		return nil
+	default:
+		return fmt.Errorf("invalid game kind: %q", raw)
+	}
+}
+
 // Bounds represents the dimensions of a 2D board.
 type Bounds struct {
 	// Width is the number of columns.

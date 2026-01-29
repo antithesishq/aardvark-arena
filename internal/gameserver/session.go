@@ -38,7 +38,7 @@ func (s *SessionManager) ActiveSessions() int {
 }
 
 // CreateSession idempotently creates a session, returning an error if the
-// session is finished.
+// session is finished or the requested game is incorrect.
 func (s *SessionManager) CreateSession(sid internal.SessionID, game game.Kind, deadline time.Time) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -52,6 +52,7 @@ func (s *SessionManager) CreateSession(sid internal.SessionID, game game.Kind, d
 		handle := sessionHandle{
 			ctx:    ctx,
 			cancel: cancel,
+			game:   game,
 			inbox:  inboxCh,
 			result: s.resultCh,
 		}
@@ -63,12 +64,16 @@ func (s *SessionManager) CreateSession(sid internal.SessionID, game game.Kind, d
 	if handle.IsFinished() {
 		return fmt.Errorf("session %s is already finished", sid)
 	}
+	if handle.game != game {
+		return fmt.Errorf("session %s already exists with different game kind", sid)
+	}
 	return nil
 }
 
 type sessionHandle struct {
 	ctx    context.Context
 	cancel context.CancelFunc
+	game   game.Kind
 	inbox  chan inboxMsg
 	result chan resultMsg
 }
@@ -117,6 +122,8 @@ func (h *sessionHandle) RunToCompletion(g game.Kind, deadline time.Time) {
 			session:  game.NewBattleshipSession(),
 		}
 		protocol.RunToCompletion()
+	default:
+		panic("unsupported game kind")
 	}
 }
 
