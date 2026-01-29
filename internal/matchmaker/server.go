@@ -17,8 +17,8 @@ type Config struct {
 	// GameServers is the list of available game server URLs to route to.
 	GameServers []*url.URL
 
-	// APIKey authenticates requests from game servers.
-	APIKey internal.APIKey
+	// Token authenticates requests to/from game servers.
+	Token internal.Token
 }
 
 // Server manages matchmaking.

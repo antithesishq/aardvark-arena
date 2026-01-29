@@ -4,9 +4,11 @@ package internal
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 )
@@ -17,20 +19,50 @@ type PlayerID = uuid.UUID
 // SessionID identifies a game session.
 type SessionID = uuid.UUID
 
-// APIKey authenticates API requests.
-type APIKey uuid.UUID
+// Token authenticates API requests.
+type Token uuid.UUID
 
-func (f *APIKey) String() string {
-	return f.String()
+func (t *Token) IsNil() bool {
+	return t == nil || uuid.UUID(*t) == uuid.Nil
 }
 
-func (f *APIKey) Set(val string) error {
+func (t *Token) String() string {
+	return t.String()
+}
+
+func (t *Token) Set(val string) error {
 	parsed, err := uuid.Parse(val)
 	if err != nil {
 		return err
 	}
-	*f = APIKey(parsed)
+	*t = Token(parsed)
 	return nil
+}
+
+// TokenAuth wraps a handler with token authentication.
+// If token is all zeros, authentication is skipped.
+func TokenAuth(token Token, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if token.IsNil() {
+			next(w, r)
+			return
+		}
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			WriteError(w, http.StatusUnauthorized, errors.New("missing authorization header"))
+			return
+		}
+		provided, found := strings.CutPrefix(authHeader, "Bearer ")
+		if !found {
+			WriteError(w, http.StatusUnauthorized, errors.New("invalid authorization header"))
+			return
+		}
+		if provided != token.String() {
+			WriteError(w, http.StatusUnauthorized, errors.New("invalid token"))
+			return
+		}
+		next(w, r)
+	}
 }
 
 // WriteError writes an error response with the given status code.

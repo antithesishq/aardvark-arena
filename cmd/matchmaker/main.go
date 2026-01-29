@@ -23,8 +23,8 @@ func main() {
 	addr := flag.String("addr", ":8080", "server listen address")
 	sessionTimeout := flag.Duration("session-timeout", DefaultSessionTimeout, "duration after which unfinished sessions are cancelled")
 	flag.Var(&gameServers, "gameserver", "gameserver URL (can be repeated)")
-	var apiKey internal.APIKey
-	flag.Var(&apiKey, "key", "API key for authenticating gameserver requests")
+	var token internal.Token
+	flag.Var(&token, "key", "token for authenticating gameserver requests")
 	flag.Parse()
 
 	log.Println("starting matchmaker...")
@@ -37,7 +37,7 @@ func main() {
 	cfg := matchmaker.Config{
 		SessionTimeout: *sessionTimeout,
 		GameServers:    gameServers,
-		APIKey:         apiKey,
+		Token:          token,
 	}
 	srv := matchmaker.New(cfg)
 	log.Printf("listening on %s", *addr)

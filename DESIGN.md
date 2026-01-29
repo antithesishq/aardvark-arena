@@ -21,7 +21,7 @@ This section documents shared concepts and types between all of the components i
 ```go
 type PlayerId = UUID
 type SessionId = UUID
-type ApiKey = UUID
+type Token = UUID
 ```
 
 ## Game types

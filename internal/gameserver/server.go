@@ -17,7 +17,7 @@ import (
 type Config struct {
 	TurnTimeout   time.Duration
 	MaxSessions   int
-	APIKey        *internal.APIKey
+	Token         internal.Token
 	MatchmakerURL *url.URL
 }
 
@@ -41,7 +41,7 @@ func New(cfg Config) *Server {
 
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET /health", s.handleHealth)
-	s.mux.HandleFunc("PUT /session/{sid}", s.handleCreateSession)
+	s.mux.HandleFunc("PUT /session/{sid}", internal.TokenAuth(s.cfg.Token, s.handleCreateSession))
 	s.mux.HandleFunc("/session/{sid}/{pid}", s.handleSessionConnect)
 }
 

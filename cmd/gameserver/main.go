@@ -19,8 +19,8 @@ func main() {
 	addr := flag.String("addr", ":8081", "server listen address")
 	turnTimeout := flag.Duration("turn-timeout", 30*time.Second, "max duration for a player to submit a move")
 	maxSessions := flag.Int("max-sessions", 100, "maximum concurrent sessions")
-	var apiKey internal.APIKey
-	flag.Var(&apiKey, "apikey", "API key for authenticating with matchmaker")
+	var token internal.Token
+	flag.Var(&token, "token", "token for authenticating with matchmaker")
 	var matchmakerURL *url.URL
 	flag.Func("matchmaker-url", "matchmaker base URL", internal.URLParser(matchmakerURL))
 	flag.Parse()
@@ -31,7 +31,7 @@ func main() {
 		TurnTimeout:   *turnTimeout,
 		MaxSessions:   *maxSessions,
 		MatchmakerURL: matchmakerURL,
-		APIKey:        &apiKey,
+		Token:         token,
 	}
 	srv := gameserver.New(cfg)
 	log.Printf("listening on %s", *addr)
