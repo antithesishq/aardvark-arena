@@ -77,7 +77,7 @@ func (s *SessionManager) CreateSession(sid internal.SessionID, game game.Kind, d
 			inbox:    inboxCh,
 			result:   s.resultCh,
 		}
-		go handle.RunToCompletion(game, deadline)
+		go handle.RunToCompletion(game, deadline, s.cfg.TurnTimeout)
 		s.sessions[sid] = handle
 	}
 
@@ -110,39 +110,39 @@ func (h *sessionHandle) IsFinished() bool {
 }
 
 // Starts a goroutine.
-func (h *sessionHandle) RunToCompletion(g game.Kind, deadline time.Time) {
+func (h *sessionHandle) RunToCompletion(g game.Kind, deadline time.Time, turnTimeout time.Duration) {
 	defer h.cancel()
 
 	switch g {
 	case game.TicTacToe:
-		protocol := Protocol[game.Position, game.TicTacToeBoard]{
-			inbox:    h.inbox,
-			result:   h.result,
-			deadline: deadline,
-			players:  make(map[internal.PlayerID]playerConn),
-			state:    game.NewState(game.NewTicTacToeBoard()),
-			session:  &game.TicTacToeSession{},
-		}
+		protocol := NewProtocol(
+			h.inbox,
+			h.result,
+			deadline,
+			turnTimeout,
+			game.NewState(game.NewTicTacToeBoard()),
+			&game.TicTacToeSession{},
+		)
 		protocol.RunToCompletion()
 	case game.Connect4:
-		protocol := Protocol[int, game.Connect4Board]{
-			inbox:    h.inbox,
-			result:   h.result,
-			deadline: deadline,
-			players:  make(map[internal.PlayerID]playerConn),
-			state:    game.NewState(game.NewConnect4Board()),
-			session:  &game.Connect4Session{},
-		}
+		protocol := NewProtocol(
+			h.inbox,
+			h.result,
+			deadline,
+			turnTimeout,
+			game.NewState(game.NewConnect4Board()),
+			&game.Connect4Session{},
+		)
 		protocol.RunToCompletion()
 	case game.Battleship:
-		protocol := Protocol[game.BattleshipMove, game.BattleshipSharedState]{
-			inbox:    h.inbox,
-			result:   h.result,
-			deadline: deadline,
-			players:  make(map[internal.PlayerID]playerConn),
-			state:    game.NewState(game.NewBattleshipSharedState()),
-			session:  game.NewBattleshipSession(),
-		}
+		protocol := NewProtocol(
+			h.inbox,
+			h.result,
+			deadline,
+			turnTimeout,
+			game.NewState(game.NewBattleshipSharedState()),
+			&game.BattleshipSession{},
+		)
 		protocol.RunToCompletion()
 	default:
 		panic("unsupported game kind")

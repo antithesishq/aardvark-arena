@@ -14,6 +14,7 @@ import (
 )
 
 var DefaultSessionTimeout = 5 * time.Minute
+var DefaultMatchInterval = time.Second
 var DefaultGameServer = "http://localhost:8081"
 
 func main() {
@@ -22,9 +23,11 @@ func main() {
 	var gameServers internal.URLList
 	addr := flag.String("addr", ":8080", "server listen address")
 	sessionTimeout := flag.Duration("session-timeout", DefaultSessionTimeout, "duration after which unfinished sessions are cancelled")
+	matchInterval := flag.Duration("match-interval", DefaultMatchInterval, "interval between checking the match queue")
 	flag.Var(&gameServers, "gameserver", "gameserver URL (can be repeated)")
 	var token internal.Token
 	flag.Var(&token, "key", "token for authenticating gameserver requests")
+	databasePath := flag.String("db-path", ":memory:", "path to the SQLite database")
 	flag.Parse()
 
 	log.Println("starting matchmaker...")
@@ -36,10 +39,15 @@ func main() {
 
 	cfg := matchmaker.Config{
 		SessionTimeout: *sessionTimeout,
+		MatchInterval:  *matchInterval,
 		GameServers:    gameServers,
 		Token:          token,
+		DatabasePath:   *databasePath,
 	}
-	srv := matchmaker.New(cfg)
+	srv, err := matchmaker.New(cfg)
+	if err != nil {
+		log.Fatalf("failed to create server: %v", err)
+	}
 	log.Printf("listening on %s", *addr)
 	if err := http.ListenAndServe(*addr, srv); err != nil {
 		log.Fatalf("server error: %v", err)

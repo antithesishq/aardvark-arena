@@ -71,6 +71,8 @@ const (
 	Connect4 Kind = "connect4"
 )
 
+var AllGames = [...]Kind{Battleship, TicTacToe, Connect4}
+
 // MarshalText implements encoding.TextMarshaler.
 func (k Kind) MarshalText() ([]byte, error) {
 	return []byte(k), nil

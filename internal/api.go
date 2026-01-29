@@ -2,7 +2,6 @@
 package internal
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -89,13 +88,13 @@ func BindJSON[T any](r io.Reader) (T, error) {
 	return data, err
 }
 
-// EncodeJSON encodes the given data as JSON and returns a reader.
-func EncodeJSON[T any](t T) (*bytes.Reader, error) {
+// EncodeJSON encodes the given data as JSON bytes.
+func EncodeJSON[T any](t T) ([]byte, error) {
 	data, err := json.Marshal(t)
 	if err != nil {
 		return nil, err
 	}
-	return bytes.NewReader(data), nil
+	return data, nil
 }
 
 // RespondJSON encodes the given data as JSON and writes it to the response.

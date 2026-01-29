@@ -127,11 +127,11 @@ PUT /queue/{PlayerId}
   Body: {
     Game: GameKind | null
   }
-  returns: {
-    QueueStatus: queued | matched
-    GameserverUrl: string <- if matched
-    SessionId: SessionId <- if matched
-    Game: GameKind <- if matched
+  If unmatched: returns 202 Accepted
+  If matched: 200 OK {
+    Server: string
+    SessionId: SessionId
+    Game: GameKind
   }
 Ensures that the provided Player ID is in the queue.
 If the player has been matched to a session, returns session details.
@@ -161,10 +161,6 @@ A background task scans all players in the queue and attempts to match them toge
 ### Session Timeout Task
 
 If a session has not completed in the SessionTimeout, the session is cancelled and the players are removed from the queue.
-
-### Gameserver Health Check
-
-The Matchmaker checks the health of all Gameservers every second. If a Gameserver is down or is out of capacity, the Matchmaker will avoid sending new sessions its way.
 
 # Gameserver
 

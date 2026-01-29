@@ -39,10 +39,32 @@ type Protocol[Move any, Shared any] struct {
 	inbox  <-chan inboxMsg
 	result chan<- resultMsg
 
-	deadline time.Time
-	players  map[internal.PlayerID]playerConn
-	state    game.State[Shared]
-	session  game.Session[Move, Shared]
+	deadline    time.Time
+	turnTimeout time.Duration
+	turnTimer   *time.Timer
+	players     map[internal.PlayerID]playerConn
+	state       game.State[Shared]
+	session     game.Session[Move, Shared]
+}
+
+func NewProtocol[M any, S any](
+	inbox <-chan inboxMsg,
+	result chan<- resultMsg,
+	deadline time.Time,
+	turnTimeout time.Duration,
+	state game.State[S],
+	session game.Session[M, S],
+) Protocol[M, S] {
+	return Protocol[M, S]{
+		inbox:       inbox,
+		result:      result,
+		deadline:    deadline,
+		turnTimeout: turnTimeout,
+		turnTimer:   time.NewTimer(turnTimeout),
+		players:     make(map[internal.PlayerID]playerConn),
+		state:       state,
+		session:     session,
+	}
 }
 
 // RunToCompletion runs the game session until it ends or the deadline is reached.
@@ -54,6 +76,9 @@ func (p *Protocol[M, S]) RunToCompletion() {
 		select {
 		case <-timer.C:
 			p.result <- resultMsg{status: game.Cancelled}
+			return
+		case <-p.turnTimer.C:
+			p.result <- resultMsg{status: p.state.CurrentPlayer.Opponent().Wins()}
 			return
 		case msg, ok := <-p.inbox:
 			if !ok {
@@ -122,6 +147,8 @@ func (p *Protocol[M, S]) handleMove(pid internal.PlayerID, rawMove json.RawMessa
 		p.SendErr(pid, fmt.Errorf("invalid move: %w", err))
 		return nil
 	}
+	// reset turn timer after each valid move
+	p.turnTimer.Reset(p.turnTimeout)
 	if err := p.BroadcastState(); err != nil {
 		return err
 	}

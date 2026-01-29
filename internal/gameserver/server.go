@@ -38,14 +38,14 @@ func New(cfg Config) *Server {
 	return s
 }
 
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.mux.ServeHTTP(w, r)
+}
+
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET /health", s.handleHealth)
 	s.mux.HandleFunc("PUT /session/{sid}", internal.TokenAuth(s.cfg.Token, s.handleCreateSession))
 	s.mux.HandleFunc("/session/{sid}/{pid}", s.handleSessionConnect)
-}
-
-func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.mux.ServeHTTP(w, r)
 }
 
 // HealthResponse contains the server health status.

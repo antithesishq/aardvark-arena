@@ -1,6 +1,7 @@
 package gameserver
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -64,7 +65,7 @@ func TestServerSanity(t *testing.T) {
 			t.Fatalf("failed to encode body: %v", err)
 		}
 
-		req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/session/%s", sid), body)
+		req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/session/%s", sid), bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
 
@@ -93,7 +94,7 @@ func TestServerSanity(t *testing.T) {
 			t.Fatalf("failed to encode body: %v", err)
 		}
 
-		req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/session/%s", sid), body)
+		req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/session/%s", sid), bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
 		srv.ServeHTTP(rec, req)
@@ -108,7 +109,7 @@ func TestServerSanity(t *testing.T) {
 			t.Fatalf("failed to encode body: %v", err)
 		}
 
-		req = httptest.NewRequest(http.MethodPut, fmt.Sprintf("/session/%s", sid), body)
+		req = httptest.NewRequest(http.MethodPut, fmt.Sprintf("/session/%s", sid), bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		rec = httptest.NewRecorder()
 		srv.ServeHTTP(rec, req)

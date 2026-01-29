@@ -14,47 +14,76 @@ type Config struct {
 	// SessionTimeout is the duration after which unfinished sessions are cancelled.
 	SessionTimeout time.Duration
 
+	// How frequently will the match queue be checked for matches
+	MatchInterval time.Duration
+
 	// GameServers is the list of available game server URLs to route to.
 	GameServers []*url.URL
 
 	// Token authenticates requests to/from game servers.
 	Token internal.Token
+
+	// DatabasePath is the path to the SQLite database file.
+	DatabasePath string
 }
 
 // Server manages matchmaking.
 type Server struct {
-	cfg Config
-	mux *http.ServeMux
+	cfg   Config
+	mux   *http.ServeMux
+	queue *MatchQueue
+	db    *DB
 }
 
 // New creates a new Server.
-func New(cfg Config) *Server {
+func New(cfg Config) (*Server, error) {
+	db, err := NewDB(cfg.DatabasePath)
+	if err != nil {
+		return nil, err
+	}
 	s := &Server{
-		cfg: cfg,
-		mux: http.NewServeMux(),
+		cfg:   cfg,
+		mux:   http.NewServeMux(),
+		queue: NewMatchQueue(NewFleet(cfg.GameServers, cfg.SessionTimeout)),
+		db:    db,
 	}
 	s.routes()
-	return s
-}
-
-func (s *Server) routes() {
-	s.mux.HandleFunc("GET /health", s.handleHealth)
+	s.queue.StartMatcher(cfg.MatchInterval)
+	return s, nil
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.mux.ServeHTTP(w, r)
 }
 
-// HealthResponse contains the server health status.
-type HealthResponse struct {
-	Status string
+func (s *Server) routes() {
+	s.mux.HandleFunc("GET /health", s.handleHealth)
+	s.mux.HandleFunc("PUT /queue/{pid}", s.handleQueue)
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
-	health := HealthResponse{
-		Status: "ok",
+	w.Write([]byte("ok"))
+}
+
+func (s *Server) handleQueue(w http.ResponseWriter, r *http.Request) {
+	pid, err := internal.PathUUID(r, "pid")
+	if err != nil {
+		internal.WriteError(w, http.StatusBadRequest, err)
+		return
 	}
-	if err := internal.RespondJSON(w, health); err != nil {
+	player, err := s.db.GetOrCreatePlayer(pid)
+	if err != nil {
 		internal.WriteError(w, http.StatusInternalServerError, err)
+		return
 	}
+	info, err := s.queue.Queue(player)
+	if err != nil {
+		internal.WriteError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if info == nil {
+		w.WriteHeader(http.StatusAccepted)
+		w.Write([]byte("queued"))
+	}
+	internal.RespondJSON(w, info)
 }
