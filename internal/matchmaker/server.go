@@ -122,5 +122,11 @@ func (s *Server) handleResult(w http.ResponseWriter, r *http.Request) {
 		internal.WriteError(w, http.StatusBadRequest, err)
 		return
 	}
+	_, err = internal.BindJSON[ResultRequest](r.Body)
+	if err != nil {
+		internal.WriteError(w, http.StatusBadRequest, err)
+		return
+	}
+	// TODO: store result in db
 	_, _ = w.Write([]byte(sid.String()))
 }

@@ -27,12 +27,12 @@ type PlayerModel struct {
 
 // SessionModel represents a session row in the database.
 type SessionModel struct {
-	SessionID   internal.SessionID          `db:"session_id"`
+	SessionID   internal.SessionID `db:"session_id"`
 	Server      string
 	Game        string
-	CreatedAt   time.Time                   `db:"created_at"`
+	CreatedAt   time.Time `db:"created_at"`
 	Deadline    time.Time
-	CompletedAt sql.NullTime                `db:"completed_at"`
+	CompletedAt sql.NullTime `db:"completed_at"`
 	Cancelled   sql.NullBool
 	WinnerID    sql.Null[internal.PlayerID] `db:"winner_id"`
 }
@@ -98,9 +98,9 @@ func ensureSchema(conn sqlx.Execer) error {
 			session_id BLOB NOT NULL PRIMARY KEY,
 			server TEXT NOT NULL,
 			game TEXT NOT NULL,
-			created_at INTEGER NOT NULL,
-			deadline INTEGER NOT NULL,
-			completed_at INTEGER,
+			created_at DATETIME NOT NULL,
+			deadline DATETIME NOT NULL,
+			completed_at DATETIME,
 			cancelled BOOL,
 			winner_id BLOB,
 
