@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/antithesishq/aardvark-arena/internal"
 	"github.com/antithesishq/aardvark-arena/internal/game"
 )
 
@@ -21,7 +22,7 @@ func TestFleetSanity(t *testing.T) {
 		defer srv.Close()
 
 		u, _ := url.Parse(srv.URL)
-		fleet := NewFleet([]*url.URL{u}, 5*time.Minute)
+		fleet := NewFleet([]*url.URL{u}, internal.NilToken, 5*time.Minute)
 
 		info, err := fleet.CreateSession(game.TicTacToe)
 		if err != nil {
@@ -50,7 +51,7 @@ func TestFleetSanity(t *testing.T) {
 		u, _ := url.Parse(srv.URL)
 		// Two entries pointing at the same test server so the fleet has a
 		// second candidate after the first returns 503.
-		fleet := NewFleet([]*url.URL{u, u}, 5*time.Minute)
+		fleet := NewFleet([]*url.URL{u, u}, internal.NilToken, 5*time.Minute)
 
 		info, err := fleet.CreateSession(game.TicTacToe)
 		if err != nil {
@@ -68,7 +69,7 @@ func TestFleetSanity(t *testing.T) {
 		defer srv.Close()
 
 		u, _ := url.Parse(srv.URL)
-		fleet := NewFleet([]*url.URL{u}, 5*time.Minute)
+		fleet := NewFleet([]*url.URL{u}, internal.NilToken, 5*time.Minute)
 
 		_, err := fleet.CreateSession(game.TicTacToe)
 		if err != ErrNoServersAvailable {
@@ -77,7 +78,7 @@ func TestFleetSanity(t *testing.T) {
 	})
 
 	t.Run("no servers configured", func(t *testing.T) {
-		fleet := NewFleet(nil, 5*time.Minute)
+		fleet := NewFleet(nil, internal.NilToken, 5*time.Minute)
 
 		_, err := fleet.CreateSession(game.TicTacToe)
 		if err != ErrNoServersAvailable {

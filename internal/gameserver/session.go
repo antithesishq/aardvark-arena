@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -70,6 +71,7 @@ func (s *SessionManager) CreateSession(sid internal.SessionID, game game.Kind, d
 		inboxCh := make(chan inboxMsg, 2)
 		ctx, cancel := context.WithCancel(context.Background())
 		handle := sessionHandle{
+			sid:      sid,
 			ctx:      ctx,
 			cancel:   cancel,
 			game:     game,
@@ -92,6 +94,7 @@ func (s *SessionManager) CreateSession(sid internal.SessionID, game game.Kind, d
 }
 
 type sessionHandle struct {
+	sid      internal.SessionID
 	ctx      context.Context
 	cancel   context.CancelFunc
 	game     game.Kind
@@ -118,6 +121,7 @@ func (h *sessionHandle) RunToCompletion(g game.Kind, deadline time.Time, turnTim
 		protocol := NewProtocol(
 			h.inbox,
 			h.result,
+			h.sid,
 			deadline,
 			turnTimeout,
 			game.NewState(game.NewTicTacToeBoard()),
@@ -128,6 +132,7 @@ func (h *sessionHandle) RunToCompletion(g game.Kind, deadline time.Time, turnTim
 		protocol := NewProtocol(
 			h.inbox,
 			h.result,
+			h.sid,
 			deadline,
 			turnTimeout,
 			game.NewState(game.NewConnect4Board()),
@@ -138,6 +143,7 @@ func (h *sessionHandle) RunToCompletion(g game.Kind, deadline time.Time, turnTim
 		protocol := NewProtocol(
 			h.inbox,
 			h.result,
+			h.sid,
 			deadline,
 			turnTimeout,
 			game.NewState(game.NewBattleshipSharedState()),
@@ -145,7 +151,7 @@ func (h *sessionHandle) RunToCompletion(g game.Kind, deadline time.Time, turnTim
 		)
 		protocol.RunToCompletion()
 	default:
-		panic("unsupported game kind")
+		log.Fatal("unsupported game kind")
 	}
 }
 

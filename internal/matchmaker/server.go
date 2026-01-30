@@ -45,7 +45,7 @@ func New(cfg Config) (*Server, error) {
 	s := &Server{
 		cfg:   cfg,
 		mux:   http.NewServeMux(),
-		queue: NewMatchQueue(NewFleet(cfg.GameServers, cfg.SessionTimeout)),
+		queue: NewMatchQueue(NewFleet(cfg.GameServers, cfg.Token, cfg.SessionTimeout)),
 		db:    db,
 	}
 	s.routes()
@@ -109,4 +109,17 @@ func (s *Server) handleUnqueue(w http.ResponseWriter, r *http.Request) {
 	}
 	s.queue.Unqueue(pid)
 	_, _ = w.Write([]byte("ok"))
+}
+
+type ResultRequest struct {
+	Status game.Status
+}
+
+func (s *Server) handleResult(w http.ResponseWriter, r *http.Request) {
+	sid, err := internal.PathUUID(r, "sid")
+	if err != nil {
+		internal.WriteError(w, http.StatusBadRequest, err)
+		return
+	}
+	_, _ = w.Write([]byte(sid.String()))
 }

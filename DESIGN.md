@@ -140,7 +140,7 @@ If the player does not choose a game, they will queue for any game.
 DELETE /queue/{PlayerId}
 Removes player from queue if they are in the queue.
 
-POST /results/{SessionId}
+PUT /results/{SessionId}
   Requires API key auth.
   Body: {
     Cancelled: bool

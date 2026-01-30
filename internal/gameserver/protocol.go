@@ -3,6 +3,7 @@ package gameserver
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/antithesishq/aardvark-arena/internal"
@@ -30,7 +31,7 @@ type playerConn struct {
 
 // resultMsg represents the outcome of a game session.
 type resultMsg struct {
-	err    error
+	sid    internal.SessionID
 	status game.Status // the final status of the game
 }
 
@@ -39,6 +40,7 @@ type Protocol[Move any, Shared any] struct {
 	inbox  <-chan inboxMsg
 	result chan<- resultMsg
 
+	sid         internal.SessionID
 	deadline    time.Time
 	turnTimeout time.Duration
 	turnTimer   *time.Timer
@@ -51,6 +53,7 @@ type Protocol[Move any, Shared any] struct {
 func NewProtocol[M any, S any](
 	inbox <-chan inboxMsg,
 	result chan<- resultMsg,
+	sid internal.SessionID,
 	deadline time.Time,
 	turnTimeout time.Duration,
 	state game.State[S],
@@ -59,12 +62,20 @@ func NewProtocol[M any, S any](
 	return Protocol[M, S]{
 		inbox:       inbox,
 		result:      result,
+		sid:         sid,
 		deadline:    deadline,
 		turnTimeout: turnTimeout,
 		turnTimer:   time.NewTimer(turnTimeout),
 		players:     make(map[internal.PlayerID]playerConn),
 		state:       state,
 		session:     session,
+	}
+}
+
+func (p *Protocol[M, S]) report(status game.Status) {
+	p.result <- resultMsg{
+		sid:    p.sid,
+		status: status,
 	}
 }
 
@@ -76,36 +87,31 @@ func (p *Protocol[M, S]) RunToCompletion() {
 	for {
 		select {
 		case <-timer.C:
-			p.result <- resultMsg{status: game.Cancelled}
+			p.report(game.Cancelled)
 			return
 		case <-p.turnTimer.C:
-			p.result <- resultMsg{status: p.state.CurrentPlayer.Opponent().Wins()}
+			p.report(p.state.CurrentPlayer.Opponent().Wins())
 			return
 		case msg, ok := <-p.inbox:
 			if !ok {
 				return
 			}
-			var err error
 			if msg.conn != nil && msg.move != nil {
-				panic("BUG: both move and conn are set")
+				log.Fatal("BUG: both move and conn are set")
 			} else if msg.conn != nil {
-				err = p.handleConn(msg.pid, msg.conn)
+				p.handleConn(msg.pid, msg.conn)
 			} else if msg.move != nil {
-				err = p.handleMove(msg.pid, msg.move)
-			}
-			if err != nil {
-				p.result <- resultMsg{err: err}
-				return
+				p.handleMove(msg.pid, msg.move)
 			}
 			if p.state.Status.IsTerminal() {
-				p.result <- resultMsg{status: p.state.Status}
+				p.report(p.state.Status)
 				return
 			}
 		}
 	}
 }
 
-func (p *Protocol[M, S]) handleConn(pid internal.PlayerID, conn chan<- StateOrErr) error {
+func (p *Protocol[M, S]) handleConn(pid internal.PlayerID, conn chan<- StateOrErr) {
 	if existing, ok := p.players[pid]; ok {
 		// if existing, replace
 		close(existing.conn)
@@ -127,33 +133,30 @@ func (p *Protocol[M, S]) handleConn(pid internal.PlayerID, conn chan<- StateOrEr
 	}
 
 	// make sure the new connection sees the latest state
-	return p.SendState(pid)
+	p.SendState(pid)
 }
 
-func (p *Protocol[M, S]) handleMove(pid internal.PlayerID, rawMove json.RawMessage) error {
+func (p *Protocol[M, S]) handleMove(pid internal.PlayerID, rawMove json.RawMessage) {
 	playerConn, ok := p.players[pid]
 	if !ok {
-		panic("BUG: move from disconnected player")
+		log.Fatal("BUG: move from disconnected player")
 	}
 
 	var move M
 	if err := json.Unmarshal(rawMove, &move); err != nil {
 		p.SendErr(pid, fmt.Errorf("invalid move: %w", err))
-		return nil
+		return
 	}
 
 	var err error
 	p.state, err = p.session.MakeMove(p.state, playerConn.player, move)
 	if err != nil {
 		p.SendErr(pid, fmt.Errorf("invalid move: %w", err))
-		return nil
+		return
 	}
 	// reset turn timer after each valid move
 	p.turnTimer.Reset(p.turnTimeout)
-	if err := p.BroadcastState(); err != nil {
-		return err
-	}
-	return nil
+	p.BroadcastState()
 }
 
 // TrySend attempts to send a message to a player if they are connected.
@@ -165,23 +168,19 @@ func (p *Protocol[M, S]) TrySend(pid internal.PlayerID, msg StateOrErr) {
 }
 
 // BroadcastState sends the current game state to all connected players.
-func (p *Protocol[M, S]) BroadcastState() error {
+func (p *Protocol[M, S]) BroadcastState() {
 	for pid := range p.players {
-		if err := p.SendState(pid); err != nil {
-			return err
-		}
+		p.SendState(pid)
 	}
-	return nil
 }
 
 // SendState sends the current game state to a specific player.
-func (p *Protocol[M, S]) SendState(pid internal.PlayerID) error {
+func (p *Protocol[M, S]) SendState(pid internal.PlayerID) {
 	encodedState, err := json.Marshal(p.state)
 	if err != nil {
-		return err
+		log.Fatalf("failed to marshal state: %v", err)
 	}
 	p.TrySend(pid, StateOrErr{State: encodedState})
-	return nil
 }
 
 // SendErr sends an error message to a specific player.

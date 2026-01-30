@@ -26,6 +26,7 @@ var ErrNoServersAvailable = fmt.Errorf("no gameservers available")
 type Fleet struct {
 	servers        []*server
 	client         *http.Client
+	token          internal.Token
 	sessionTimeout time.Duration
 }
 
@@ -39,7 +40,7 @@ type server struct {
 }
 
 // NewFleet creates a Fleet from the given server URLs.
-func NewFleet(urls []*url.URL, sessionTimeout time.Duration) *Fleet {
+func NewFleet(urls []*url.URL, token internal.Token, sessionTimeout time.Duration) *Fleet {
 	var servers []*server
 	for _, url := range urls {
 		servers = append(servers, &server{url: *url})
@@ -56,6 +57,7 @@ func NewFleet(urls []*url.URL, sessionTimeout time.Duration) *Fleet {
 	return &Fleet{
 		servers:        servers,
 		client:         client,
+		token:          token,
 		sessionTimeout: sessionTimeout,
 	}
 }
@@ -104,6 +106,9 @@ func (f *Fleet) CreateSession(kind game.Kind) (*SessionInfo, error) {
 			return nil, err
 		}
 		req.Header.Set("Content-Type", "application/json")
+		if !f.token.IsNil() {
+			req.Header.Set("Authorization", "Bearer "+f.token.String())
+		}
 		resp, err := f.client.Do(req)
 		if urlerr, ok := err.(*url.Error); ok {
 			if urlerr.Temporary() {

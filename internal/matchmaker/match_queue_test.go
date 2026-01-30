@@ -7,13 +7,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/antithesishq/aardvark-arena/internal"
 	"github.com/antithesishq/aardvark-arena/internal/game"
 	"github.com/google/uuid"
 )
 
 func TestMatchQueueSanity(t *testing.T) {
 	t.Run("queue returns nil before match", func(t *testing.T) {
-		fleet := NewFleet(nil, 5*time.Minute)
+		fleet := NewFleet(nil, internal.NilToken, 5*time.Minute)
 		q := NewMatchQueue(fleet)
 
 		session, err := q.Queue(&PlayerModel{
@@ -35,7 +36,7 @@ func TestMatchQueueSanity(t *testing.T) {
 		defer srv.Close()
 
 		u, _ := url.Parse(srv.URL)
-		fleet := NewFleet([]*url.URL{u}, 5*time.Minute)
+		fleet := NewFleet([]*url.URL{u}, internal.NilToken, 5*time.Minute)
 		q := NewMatchQueue(fleet)
 
 		p1 := &PlayerModel{PlayerID: uuid.New(), Elo: 1000}
@@ -70,7 +71,7 @@ func TestMatchQueueSanity(t *testing.T) {
 	})
 
 	t.Run("elo too far apart not matched", func(t *testing.T) {
-		fleet := NewFleet(nil, 5*time.Minute)
+		fleet := NewFleet(nil, internal.NilToken, 5*time.Minute)
 		q := NewMatchQueue(fleet)
 
 		p1 := &PlayerModel{PlayerID: uuid.New(), Elo: 1000}

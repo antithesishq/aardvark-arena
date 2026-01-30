@@ -21,9 +21,11 @@ type SessionID = uuid.UUID
 // Token authenticates API requests.
 type Token uuid.UUID
 
+var NilToken = Token(uuid.Nil)
+
 // IsNil returns true if the token is nil or the zero UUID.
 func (t *Token) IsNil() bool {
-	return t == nil || uuid.UUID(*t) == uuid.Nil
+	return t == nil || *t == NilToken
 }
 
 // String returns the string representation of the token.
