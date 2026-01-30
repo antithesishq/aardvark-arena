@@ -3,7 +3,6 @@ package matchmaker
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"math/rand"
 	"net"
 	"net/http"
@@ -95,17 +94,17 @@ func (f *Fleet) CreateSession(kind game.Kind) (*SessionInfo, error) {
 	// try to create a session on each candidate
 	for _, server := range candidates {
 		sid := uuid.New()
-		req := &http.Request{
-			Method:        "PUT",
-			URL:           server.url.JoinPath("session", sid.String()),
-			Header:        http.Header{"Content-Type": {"application/json"}},
-			Body:          io.NopCloser(bytes.NewReader(body)),
-			ContentLength: int64(len(body)),
+		reqURL := server.url.JoinPath("session", sid.String())
+		req, err := http.NewRequest("PUT", reqURL.String(), bytes.NewReader(body))
+		if err != nil {
+			return nil, err
 		}
+		req.Header.Set("Content-Type", "application/json")
 		resp, err := f.client.Do(req)
 		if urlerr, ok := err.(*url.Error); ok {
 			if urlerr.Temporary() {
-				*server.retryAt = time.Now().Add(FailureTimeout)
+				retryAt := time.Now().Add(FailureTimeout)
+				server.retryAt = &retryAt
 				continue
 			}
 		}
@@ -119,7 +118,8 @@ func (f *Fleet) CreateSession(kind game.Kind) (*SessionInfo, error) {
 				Game:      kind,
 			}, nil
 		} else if resp.StatusCode == http.StatusServiceUnavailable {
-			*server.retryAt = time.Now().Add(FailureTimeout)
+			retryAt := time.Now().Add(FailureTimeout)
+			server.retryAt = &retryAt
 			continue
 		} else {
 			// all other status's are unexpected errors

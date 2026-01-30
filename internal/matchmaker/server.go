@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/antithesishq/aardvark-arena/internal"
+	"github.com/antithesishq/aardvark-arena/internal/game"
 )
 
 // Config holds server configuration.
@@ -59,14 +60,24 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET /health", s.handleHealth)
 	s.mux.HandleFunc("PUT /queue/{pid}", s.handleQueue)
+	s.mux.HandleFunc("DELETE /queue/{pid}", s.handleUnqueue)
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	w.Write([]byte("ok"))
 }
 
+type QueueRequest struct {
+	Game *game.Kind
+}
+
 func (s *Server) handleQueue(w http.ResponseWriter, r *http.Request) {
 	pid, err := internal.PathUUID(r, "pid")
+	if err != nil {
+		internal.WriteError(w, http.StatusBadRequest, err)
+		return
+	}
+	body, err := internal.BindJSON[QueueRequest](r.Body)
 	if err != nil {
 		internal.WriteError(w, http.StatusBadRequest, err)
 		return
@@ -76,7 +87,7 @@ func (s *Server) handleQueue(w http.ResponseWriter, r *http.Request) {
 		internal.WriteError(w, http.StatusInternalServerError, err)
 		return
 	}
-	info, err := s.queue.Queue(player)
+	info, err := s.queue.Queue(player, body.Game)
 	if err != nil {
 		internal.WriteError(w, http.StatusInternalServerError, err)
 		return
@@ -86,4 +97,14 @@ func (s *Server) handleQueue(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("queued"))
 	}
 	internal.RespondJSON(w, info)
+}
+
+func (s *Server) handleUnqueue(w http.ResponseWriter, r *http.Request) {
+	pid, err := internal.PathUUID(r, "pid")
+	if err != nil {
+		internal.WriteError(w, http.StatusBadRequest, err)
+		return
+	}
+	s.queue.Unqueue(pid)
+	w.Write([]byte("ok"))
 }

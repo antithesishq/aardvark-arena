@@ -113,7 +113,7 @@ func (q *MatchQueue) publishMatch(session *SessionInfo, a, b *candidate) {
 
 // Queue ensures the player is in the match queue. Returns a non-nil SessionInfo
 // if the player is matched.
-func (q *MatchQueue) Queue(player *PlayerModel) (*SessionInfo, error) {
+func (q *MatchQueue) Queue(player *PlayerModel, game *game.Kind) (*SessionInfo, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -127,6 +127,14 @@ func (q *MatchQueue) Queue(player *PlayerModel) (*SessionInfo, error) {
 		pid:   player.PlayerID,
 		elo:   player.Elo,
 		entry: time.Now(),
+		game:  game,
 	}
 	return nil, nil
+}
+
+// Unqueue idempotently removes a player from the queue.
+func (q *MatchQueue) Unqueue(pid internal.PlayerID) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	delete(q.queued, pid)
 }
