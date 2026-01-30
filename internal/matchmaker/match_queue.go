@@ -154,3 +154,16 @@ func (q *MatchQueue) Unqueue(pid internal.PlayerID) {
 	defer q.mu.Unlock()
 	delete(q.queued, pid)
 }
+
+// Untrack removes a session and associated players, allowing them to requeue
+// for another match
+func (q *MatchQueue) Untrack(sid internal.SessionID) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	for pid, session := range q.matched {
+		if session.SessionID == sid {
+			delete(q.matched, pid)
+		}
+	}
+}

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/antithesishq/aardvark-arena/internal"
-	"github.com/antithesishq/aardvark-arena/internal/game"
 )
 
 // Reporter sends results back to the matchmaker
@@ -49,7 +48,14 @@ func (r *Reporter) StartReporter() {
 
 func (r *Reporter) submitResult(result resultMsg) {
 	reqURL := r.matchmakerURL.JoinPath("results", result.sid.String())
-	body, err := internal.EncodeJSON(struct{ Status game.Status }{Status: result.status})
+	type resultReq struct {
+		Cancelled bool
+		Winner    internal.PlayerID
+	}
+	body, err := internal.EncodeJSON(resultReq{
+		Cancelled: result.cancelled,
+		Winner:    result.winner,
+	})
 	if err != nil {
 		log.Panicf("failed to encode json: %v", err)
 	}

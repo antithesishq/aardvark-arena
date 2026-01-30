@@ -2,11 +2,13 @@ package matchmaker
 
 import (
 	"database/sql"
+	"log"
 	"net/url"
 	"time"
 
 	"github.com/antithesishq/aardvark-arena/internal"
 	"github.com/antithesishq/aardvark-arena/internal/game"
+	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3" // register sqlite3 driver
 )
@@ -39,14 +41,22 @@ type SessionModel struct {
 
 const selectPlayer = `
 	SELECT player_id, elo, wins, losses, draws
-	FROM players
-	WHERE player_id = ?
+	FROM players WHERE player_id = ?
 `
 
 const insertPlayer = `
 	INSERT INTO players (player_id, elo, wins, losses, draws)
 	VALUES (?, ?, 0, 0, 0)
 	RETURNING player_id, elo, wins, losses, draws
+`
+
+const updatePlayerStats = `
+	UPDATE players SET
+		elo = ?,
+		wins = IF(?, wins + 1, wins),
+		losses = IF(?, losses + 1, losses),
+		draws = IF(?, draws + 1, draws)
+	WHERE player_id = ?
 `
 
 const insertSession = `
@@ -182,10 +192,71 @@ func (db *DB) CreateSession(
 	return &s, nil
 }
 
-func (db *DB) ReportSessionResult(sid internal.SessionID, cancelled bool, winner internal.PlayerID) error {
-	_, err := db.db.Exec(`
-		UPDATE sessions WHERE session_id = ?
-		SET cancelled = ?, winner_id = ?
-	`, sid, cancelled, winner)
-	return err
+func (db *DB) ReportSessionResult(
+	sid internal.SessionID,
+	cancelled bool,
+	winner internal.PlayerID,
+) error {
+	tx, err := db.db.Beginx()
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(`
+	  UPDATE sessions
+		SET cancelled = ?, winner_id = ?, completed_at = ?
+		WHERE session_id = ?
+	`, cancelled, winner, time.Now(), sid)
+	if err != nil {
+		return err
+	}
+
+	// if cancelled, there should be no winner
+	if cancelled && winner != uuid.Nil {
+		log.Panicf("BUG: received cancelled result with a winner set")
+	}
+
+	// if the session wasn't cancelled, update elo
+	if !cancelled {
+		players := []struct {
+			PlayerID internal.PlayerID `db:"player_id"`
+			Elo      int
+		}{}
+		err = tx.Select(&players, `
+			SELECT p.player_id, p.elo
+			FROM players p
+			INNER JOIN player_session ps ON p.player_id = ps.player_id
+			INNER JOIN sessions s ON ps.session_id = s.session_id
+			WHERE s.session_id = ?
+		`, sid)
+		if err != nil {
+			return err
+		}
+
+		draw := winner == uuid.Nil
+		for i, player := range players {
+			if draw || player.PlayerID == winner {
+				opponent := players[(i+1)%2]
+				newPlayer, newOpponent := internal.CalcElo(player.Elo, opponent.Elo, draw)
+				_, err = tx.Exec(updatePlayerStats,
+					newPlayer,
+					!draw, false, draw,
+					player.PlayerID,
+				)
+				if err != nil {
+					return err
+				}
+				_, err = tx.Exec(updatePlayerStats,
+					newOpponent,
+					false, !draw, draw,
+					opponent.PlayerID,
+				)
+				if err != nil {
+					return err
+				}
+
+				break
+			}
+		}
+	}
+	return tx.Commit()
 }

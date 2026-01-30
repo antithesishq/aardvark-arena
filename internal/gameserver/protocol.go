@@ -8,6 +8,7 @@ import (
 
 	"github.com/antithesishq/aardvark-arena/internal"
 	"github.com/antithesishq/aardvark-arena/internal/game"
+	"github.com/google/uuid"
 )
 
 // StateOrErr holds either a game state or an error message.
@@ -31,8 +32,9 @@ type playerConn struct {
 
 // resultMsg represents the outcome of a game session.
 type resultMsg struct {
-	sid    internal.SessionID
-	status game.Status // the final status of the game
+	sid       internal.SessionID
+	cancelled bool
+	winner    internal.PlayerID
 }
 
 // Protocol handles the game session communication protocol.
@@ -73,10 +75,27 @@ func NewProtocol[M any, S any](
 	}
 }
 
+func (p *Protocol[M, S]) playerToID(player game.Player) internal.PlayerID {
+	for pid, p := range p.players {
+		if p.player == player {
+			return pid
+		}
+	}
+	return uuid.Nil
+}
+
 func (p *Protocol[M, S]) report(status game.Status) {
+	var winner internal.PlayerID
+	switch status {
+	case game.P1Win:
+		winner = p.playerToID(game.P1)
+	case game.P2Win:
+		winner = p.playerToID(game.P2)
+	}
 	p.result <- resultMsg{
-		sid:    p.sid,
-		status: status,
+		sid:       p.sid,
+		cancelled: status == game.Cancelled,
+		winner:    winner,
 	}
 }
 

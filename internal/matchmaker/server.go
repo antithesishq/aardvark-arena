@@ -62,6 +62,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /health", s.handleHealth)
 	s.mux.HandleFunc("PUT /queue/{pid}", s.handleQueue)
 	s.mux.HandleFunc("DELETE /queue/{pid}", s.handleUnqueue)
+	s.mux.HandleFunc("PUT /results/{sid}", internal.TokenAuth(s.cfg.Token, s.handleResult))
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
@@ -113,7 +114,8 @@ func (s *Server) handleUnqueue(w http.ResponseWriter, r *http.Request) {
 }
 
 type ResultRequest struct {
-	Status game.Status
+	Cancelled bool
+	Winner    internal.PlayerID
 }
 
 func (s *Server) handleResult(w http.ResponseWriter, r *http.Request) {
@@ -122,11 +124,16 @@ func (s *Server) handleResult(w http.ResponseWriter, r *http.Request) {
 		internal.WriteError(w, http.StatusBadRequest, err)
 		return
 	}
-	_, err = internal.BindJSON[ResultRequest](r.Body)
+	body, err := internal.BindJSON[ResultRequest](r.Body)
 	if err != nil {
 		internal.WriteError(w, http.StatusBadRequest, err)
 		return
 	}
-	// TODO: store result in db
-	_, _ = w.Write([]byte(sid.String()))
+	err = s.db.ReportSessionResult(sid, body.Cancelled, body.Winner)
+	if err != nil {
+		internal.WriteError(w, http.StatusInternalServerError, err)
+		return
+	}
+	s.queue.Untrack(sid)
+	_, _ = w.Write([]byte("ok"))
 }
