@@ -36,6 +36,6 @@ func main() {
 	srv := gameserver.New(cfg)
 	log.Printf("listening on %s", *addr)
 	if err := http.ListenAndServe(*addr, srv); err != nil {
-		log.Fatalf("server error: %v", err)
+		log.Panicf("server error: %v", err)
 	}
 }

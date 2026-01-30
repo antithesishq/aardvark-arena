@@ -46,10 +46,10 @@ func main() {
 	}
 	srv, err := matchmaker.New(cfg)
 	if err != nil {
-		log.Fatalf("failed to create server: %v", err)
+		log.Panicf("failed to create server: %v", err)
 	}
 	log.Printf("listening on %s", *addr)
 	if err := http.ListenAndServe(*addr, srv); err != nil {
-		log.Fatalf("server error: %v", err)
+		log.Panicf("server error: %v", err)
 	}
 }

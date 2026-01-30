@@ -51,11 +51,11 @@ func (r *Reporter) submitResult(result resultMsg) {
 	reqURL := r.matchmakerURL.JoinPath("results", result.sid.String())
 	body, err := internal.EncodeJSON(struct{ Status game.Status }{Status: result.status})
 	if err != nil {
-		log.Fatalf("failed to encode json: %v", err)
+		log.Panicf("failed to encode json: %v", err)
 	}
 	req, err := http.NewRequest("PUT", reqURL.String(), bytes.NewReader(body))
 	if err != nil {
-		log.Fatalf("failed to create request: %v", err)
+		log.Panicf("failed to create request: %v", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	if !r.token.IsNil() {
@@ -69,6 +69,6 @@ func (r *Reporter) submitResult(result resultMsg) {
 		}
 	}
 	if err != nil {
-		log.Fatalf("failed to submit result for session %s: %v", result.sid, err)
+		log.Panicf("failed to submit result for session %s: %v", result.sid, err)
 	}
 }

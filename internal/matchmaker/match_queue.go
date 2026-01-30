@@ -22,15 +22,17 @@ type candidate struct {
 type MatchQueue struct {
 	mu    sync.Mutex
 	fleet *Fleet
+	db    *DB
 	// map from player id to ELO
 	queued  map[internal.PlayerID]*candidate
 	matched map[internal.PlayerID]*SessionInfo
 }
 
 // NewMatchQueue creates a MatchQueue backed by the given Fleet.
-func NewMatchQueue(fleet *Fleet) *MatchQueue {
+func NewMatchQueue(fleet *Fleet, db *DB) *MatchQueue {
 	return &MatchQueue{
 		fleet:   fleet,
+		db:      db,
 		queued:  make(map[internal.PlayerID]*candidate),
 		matched: make(map[internal.PlayerID]*SessionInfo),
 	}
@@ -90,7 +92,7 @@ func (q *MatchQueue) findMatches() {
 		if err == ErrNoServersAvailable {
 			continue
 		} else if err != nil {
-			log.Fatalf("fleet error: %v", err)
+			log.Panicf("fleet error: %v", err)
 		}
 		q.publishMatch(session, match.a, match.b)
 	}
@@ -102,10 +104,22 @@ func (q *MatchQueue) publishMatch(session *SessionInfo, a, b *candidate) {
 
 	// it's possible that a or b left the queue while we were building matches, if
 	// this happens leave the other candidate in the queue, they will be matched
-	// in the next cycle
+	// in the next cycle, and the erroneous game session will eventually timeout
 	_, hasA := q.queued[a.pid]
 	_, hasB := q.queued[b.pid]
 	if hasA && hasB {
+		_, err := q.db.CreateSession(
+			session.SessionID,
+			a.pid,
+			b.pid,
+			&session.Server,
+			session.Game,
+			session.Deadline,
+		)
+		if err != nil {
+			log.Panicf("db error: %v", err)
+		}
+
 		delete(q.queued, a.pid)
 		delete(q.queued, b.pid)
 		q.matched[a.pid] = session

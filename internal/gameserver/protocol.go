@@ -65,10 +65,11 @@ func NewProtocol[M any, S any](
 		sid:         sid,
 		deadline:    deadline,
 		turnTimeout: turnTimeout,
-		turnTimer:   time.NewTimer(turnTimeout),
-		players:     make(map[internal.PlayerID]playerConn),
-		state:       state,
-		session:     session,
+		// double the initial turnTimeout as a connection grace period
+		turnTimer: time.NewTimer(turnTimeout * 2),
+		players:   make(map[internal.PlayerID]playerConn),
+		state:     state,
+		session:   session,
 	}
 }
 
@@ -178,7 +179,7 @@ func (p *Protocol[M, S]) BroadcastState() {
 func (p *Protocol[M, S]) SendState(pid internal.PlayerID) {
 	encodedState, err := json.Marshal(p.state)
 	if err != nil {
-		log.Fatalf("failed to marshal state: %v", err)
+		log.Panicf("failed to marshal state: %v", err)
 	}
 	p.TrySend(pid, StateOrErr{State: encodedState})
 }

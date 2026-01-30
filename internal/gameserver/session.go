@@ -36,10 +36,10 @@ type SessionManager struct {
 }
 
 // NewSessionManager creates a new SessionManager with the given config.
-func NewSessionManager(cfg Config) *SessionManager {
+func NewSessionManager(cfg Config, resultCh chan resultMsg) *SessionManager {
 	return &SessionManager{
 		sessions: make(map[internal.SessionID]sessionHandle),
-		resultCh: make(chan resultMsg, cfg.MaxSessions),
+		resultCh: resultCh,
 		cfg:      cfg,
 	}
 }

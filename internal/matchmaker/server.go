@@ -42,10 +42,11 @@ func New(cfg Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	fleet := NewFleet(cfg.GameServers, cfg.Token, cfg.SessionTimeout)
 	s := &Server{
 		cfg:   cfg,
 		mux:   http.NewServeMux(),
-		queue: NewMatchQueue(NewFleet(cfg.GameServers, cfg.Token, cfg.SessionTimeout)),
+		queue: NewMatchQueue(fleet, db),
 		db:    db,
 	}
 	s.routes()

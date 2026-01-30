@@ -25,16 +25,20 @@ type Server struct {
 	cfg      Config
 	mux      *http.ServeMux
 	sessions *SessionManager
+	reporter *Reporter
 }
 
 // New creates a new Server.
 func New(cfg Config) *Server {
+	resultCh := make(chan resultMsg, cfg.MaxSessions)
 	s := &Server{
 		cfg:      cfg,
 		mux:      http.NewServeMux(),
-		sessions: NewSessionManager(cfg),
+		sessions: NewSessionManager(cfg, resultCh),
+		reporter: NewReporter(resultCh, cfg.Token, cfg.MatchmakerURL),
 	}
 	s.routes()
+	s.reporter.StartReporter()
 	return s
 }
 

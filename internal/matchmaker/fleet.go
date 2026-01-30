@@ -67,6 +67,7 @@ type SessionInfo struct {
 	Server    url.URL
 	SessionID internal.SessionID
 	Game      game.Kind
+	Deadline  time.Time
 }
 
 // CreateSession creates a new game session on an available server.
@@ -89,9 +90,10 @@ func (f *Fleet) CreateSession(kind game.Kind) (*SessionInfo, error) {
 		candidates[i], candidates[j] = candidates[j], candidates[i]
 	})
 
+	deadline := time.Now().Add(f.sessionTimeout)
 	body, err := internal.EncodeJSON(gameserver.CreateSessionRequest{
 		Game:     kind,
-		Deadline: time.Now().Add(f.sessionTimeout),
+		Deadline: deadline,
 	})
 	if err != nil {
 		return nil, err
@@ -125,6 +127,7 @@ func (f *Fleet) CreateSession(kind game.Kind) (*SessionInfo, error) {
 				Server:    server.url,
 				SessionID: sid,
 				Game:      kind,
+				Deadline:  deadline,
 			}, nil
 		} else if resp.StatusCode == http.StatusServiceUnavailable {
 			retryAt := time.Now().Add(FailureTimeout)

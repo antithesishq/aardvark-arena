@@ -2,9 +2,11 @@ package matchmaker
 
 import (
 	"database/sql"
+	"net/url"
 	"time"
 
 	"github.com/antithesishq/aardvark-arena/internal"
+	"github.com/antithesishq/aardvark-arena/internal/game"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3" // register sqlite3 driver
 )
@@ -16,7 +18,7 @@ type DB struct {
 
 // PlayerModel represents a player row in the database.
 type PlayerModel struct {
-	PlayerID internal.PlayerID
+	PlayerID internal.PlayerID `db:"player_id"`
 	Elo      int
 	Wins     int
 	Losses   int
@@ -25,26 +27,39 @@ type PlayerModel struct {
 
 // SessionModel represents a session row in the database.
 type SessionModel struct {
-	SessionID   internal.SessionID
+	SessionID   internal.SessionID          `db:"session_id"`
 	Server      string
 	Game        string
-	CreatedAt   time.Time
+	CreatedAt   time.Time                   `db:"created_at"`
 	Deadline    time.Time
-	CompletedAt sql.NullTime
+	CompletedAt sql.NullTime                `db:"completed_at"`
 	Cancelled   sql.NullBool
-	WinnerID    sql.Null[internal.PlayerID]
+	WinnerID    sql.Null[internal.PlayerID] `db:"winner_id"`
 }
 
 const selectPlayer = `
-	SELECT PlayerID, Elo, Wins, Losses, Draws
+	SELECT player_id, elo, wins, losses, draws
 	FROM players
-	WHERE PlayerID = ?
+	WHERE player_id = ?
 `
 
 const insertPlayer = `
-	INSERT INTO players (PlayerID, Elo, Wins, Losses, Draws)
+	INSERT INTO players (player_id, elo, wins, losses, draws)
 	VALUES (?, ?, 0, 0, 0)
-	RETURNING PlayerID, Elo, Wins, Losses, Draws
+	RETURNING player_id, elo, wins, losses, draws
+`
+
+const insertSession = `
+	INSERT INTO sessions (session_id, server, game, created_at, deadline)
+	VALUES (?, ?, ?, ?, ?)
+	RETURNING
+		session_id, server, game, created_at, deadline,
+		completed_at, cancelled, winner_id
+`
+
+const insertPlayerSession = `
+	INSERT INTO player_session (player_id, session_id)
+	VALUES (?, ?)
 `
 
 // NewDB returns a disk-backed database stored at the provided path.
@@ -68,11 +83,11 @@ func ensureSchema(conn sqlx.Execer) error {
 	}
 	_, err = conn.Exec(`
 		CREATE TABLE IF NOT EXISTS players (
-			PlayerID BLOB NOT NULL PRIMARY KEY,
-			Elo INTEGER NOT NULL,
-			Wins INTEGER NOT NULL,
-			Losses INTEGER NOT NULL,
-			Draws INTEGER NOT NULL
+			player_id BLOB NOT NULL PRIMARY KEY,
+			elo INTEGER NOT NULL,
+			wins INTEGER NOT NULL,
+			losses INTEGER NOT NULL,
+			draws INTEGER NOT NULL
 		);
 	`)
 	if err != nil {
@@ -80,29 +95,29 @@ func ensureSchema(conn sqlx.Execer) error {
 	}
 	_, err = conn.Exec(`
 		CREATE TABLE IF NOT EXISTS sessions (
-			SessionID BLOB NOT NULL PRIMARY KEY,
-			Server TEXT NOT NULL,
-			Game TEXT NOT NULL,
-			CreatedAt INTEGER NOT NULL,
-			Deadline INTEGER NOT NULL,
-			CompletedAt INTEGER,
-			Cancelled INTEGER,
-			WinnerId BLOB,
+			session_id BLOB NOT NULL PRIMARY KEY,
+			server TEXT NOT NULL,
+			game TEXT NOT NULL,
+			created_at INTEGER NOT NULL,
+			deadline INTEGER NOT NULL,
+			completed_at INTEGER,
+			cancelled BOOL,
+			winner_id BLOB,
 
-			FOREIGN KEY(WinnerId) REFERENCES players(PlayerID)
+			FOREIGN KEY(winner_id) REFERENCES players(player_id)
 		);
 	`)
 	if err != nil {
 		return err
 	}
 	_, err = conn.Exec(`
-		CREATE TABLE IF NOT EXISTS players_sessions (
-			PlayerID BLOB NOT NULL,
-			SessionID BLOB NOT NULL,
+		CREATE TABLE IF NOT EXISTS player_session (
+			player_id BLOB NOT NULL,
+			session_id BLOB NOT NULL,
 
-			PRIMARY KEY (PlayerID, SessionID),
-			FOREIGN KEY(PlayerID) REFERENCES players(PlayerID),
-			FOREIGN KEY(SessionID) REFERENCES sessions(SessionID)
+			PRIMARY KEY (player_id, session_id),
+			FOREIGN KEY(player_id) REFERENCES players(player_id),
+			FOREIGN KEY(session_id) REFERENCES sessions(session_id)
 		);
 	`)
 	if err != nil {
@@ -117,10 +132,10 @@ func (db *DB) GetOrCreatePlayer(pid internal.PlayerID) (*PlayerModel, error) {
 	if err != nil {
 		return nil, err
 	}
-	var p *PlayerModel
-	err = tx.Get(p, selectPlayer, pid)
+	var p PlayerModel
+	err = tx.Get(&p, selectPlayer, pid)
 	if err == sql.ErrNoRows {
-		err = tx.Get(p, insertPlayer, pid, internal.DefaultElo)
+		err = tx.Get(&p, insertPlayer, pid, internal.DefaultElo)
 	}
 	if err != nil {
 		return nil, err
@@ -129,5 +144,48 @@ func (db *DB) GetOrCreatePlayer(pid internal.PlayerID) (*PlayerModel, error) {
 	if err != nil {
 		return nil, err
 	}
-	return p, nil
+	return &p, nil
+}
+
+func (db *DB) CreateSession(
+	sid internal.SessionID,
+	p1 internal.PlayerID,
+	p2 internal.PlayerID,
+	server *url.URL,
+	game game.Kind,
+	deadline time.Time,
+) (*SessionModel, error) {
+	tx, err := db.db.Beginx()
+	if err != nil {
+		return nil, err
+	}
+	var s SessionModel
+	err = tx.Get(&s, insertSession,
+		sid, server.String(), game,
+		time.Now(), deadline,
+	)
+	if err != nil {
+		return nil, err
+	}
+	_, err = tx.Exec(insertPlayerSession, p1, sid)
+	if err != nil {
+		return nil, err
+	}
+	_, err = tx.Exec(insertPlayerSession, p2, sid)
+	if err != nil {
+		return nil, err
+	}
+	err = tx.Commit()
+	if err != nil {
+		return nil, err
+	}
+	return &s, nil
+}
+
+func (db *DB) ReportSessionResult(sid internal.SessionID, cancelled bool, winner internal.PlayerID) error {
+	_, err := db.db.Exec(`
+		UPDATE sessions WHERE session_id = ?
+		SET cancelled = ?, winner_id = ?
+	`, sid, cancelled, winner)
+	return err
 }

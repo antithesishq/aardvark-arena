@@ -1,6 +1,7 @@
 package matchmaker
 
 import (
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -12,10 +13,18 @@ import (
 	"github.com/google/uuid"
 )
 
+func MustDB() *DB {
+	db, err := NewDB(":memory:")
+	if err != nil {
+		log.Panicf("failed to create sqlite db: %v", err)
+	}
+	return db
+}
+
 func TestMatchQueueSanity(t *testing.T) {
 	t.Run("queue returns nil before match", func(t *testing.T) {
 		fleet := NewFleet(nil, internal.NilToken, 5*time.Minute)
-		q := NewMatchQueue(fleet)
+		q := NewMatchQueue(fleet, MustDB())
 
 		session, err := q.Queue(&PlayerModel{
 			PlayerID: uuid.New(),
@@ -37,7 +46,7 @@ func TestMatchQueueSanity(t *testing.T) {
 
 		u, _ := url.Parse(srv.URL)
 		fleet := NewFleet([]*url.URL{u}, internal.NilToken, 5*time.Minute)
-		q := NewMatchQueue(fleet)
+		q := NewMatchQueue(fleet, MustDB())
 
 		p1 := &PlayerModel{PlayerID: uuid.New(), Elo: 1000}
 		p2 := &PlayerModel{PlayerID: uuid.New(), Elo: 1050}
@@ -72,7 +81,7 @@ func TestMatchQueueSanity(t *testing.T) {
 
 	t.Run("elo too far apart not matched", func(t *testing.T) {
 		fleet := NewFleet(nil, internal.NilToken, 5*time.Minute)
-		q := NewMatchQueue(fleet)
+		q := NewMatchQueue(fleet, MustDB())
 
 		p1 := &PlayerModel{PlayerID: uuid.New(), Elo: 1000}
 		p2 := &PlayerModel{PlayerID: uuid.New(), Elo: 1500}
