@@ -29,7 +29,7 @@ func TestMatchQueueSanity(t *testing.T) {
 	})
 
 	t.Run("two similar players get matched", func(t *testing.T) {
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		}))
 		defer srv.Close()

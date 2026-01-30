@@ -18,6 +18,7 @@ type candidate struct {
 	game *game.Kind
 }
 
+// MatchQueue pairs waiting players into game sessions.
 type MatchQueue struct {
 	mu    sync.Mutex
 	fleet *Fleet
@@ -26,6 +27,7 @@ type MatchQueue struct {
 	matched map[internal.PlayerID]*SessionInfo
 }
 
+// NewMatchQueue creates a MatchQueue backed by the given Fleet.
 func NewMatchQueue(fleet *Fleet) *MatchQueue {
 	return &MatchQueue{
 		fleet:   fleet,
@@ -43,7 +45,7 @@ func (q *MatchQueue) StartMatcher(interval time.Duration) {
 	}()
 }
 
-// findMatches matches as many players as possible currently in the queue
+// findMatches matches as many players as possible currently in the queue.
 func (q *MatchQueue) findMatches() {
 	q.mu.Lock()
 
@@ -85,7 +87,7 @@ func (q *MatchQueue) findMatches() {
 	// create a new game session for each match
 	for _, match := range matches {
 		session, err := q.fleet.CreateSession(match.game)
-		if err == NoServersAvailable {
+		if err == ErrNoServersAvailable {
 			continue
 		} else if err != nil {
 			log.Fatalf("fleet error: %v", err)

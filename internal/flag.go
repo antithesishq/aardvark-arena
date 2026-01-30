@@ -23,11 +23,6 @@ func (u *URLList) Set(val string) error {
 }
 
 // URLParser returns a function that parses a string into a destination URL.
-// Can we used with `flag.Func`:
-// ```go
-// var matchmakerURL *url.URL
-// flag.Func("matchmaker-url", "matchmaker base URL", internal.URLParser(matchmakerURL))
-// ```
 func URLParser(out *url.URL) func(string) error {
 	return func(raw string) error {
 		parsed, err := url.Parse(raw)

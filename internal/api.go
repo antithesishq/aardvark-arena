@@ -21,14 +21,17 @@ type SessionID = uuid.UUID
 // Token authenticates API requests.
 type Token uuid.UUID
 
+// IsNil returns true if the token is nil or the zero UUID.
 func (t *Token) IsNil() bool {
 	return t == nil || uuid.UUID(*t) == uuid.Nil
 }
 
+// String returns the string representation of the token.
 func (t *Token) String() string {
-	return t.String()
+	return uuid.UUID(*t).String()
 }
 
+// Set parses a UUID string and sets the token value.
 func (t *Token) Set(val string) error {
 	parsed, err := uuid.Parse(val)
 	if err != nil {

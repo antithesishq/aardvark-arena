@@ -47,6 +47,7 @@ type Protocol[Move any, Shared any] struct {
 	session     game.Session[Move, Shared]
 }
 
+// NewProtocol creates a Protocol that manages a game session.
 func NewProtocol[M any, S any](
 	inbox <-chan inboxMsg,
 	result chan<- resultMsg,

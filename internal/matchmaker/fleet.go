@@ -16,19 +16,20 @@ import (
 )
 
 // FailureTimeout is the grace period we give game servers to recover after we
-// see a network error
+// see a network error.
 var FailureTimeout = time.Minute
 
-var NoServersAvailable = fmt.Errorf("no gameservers available")
+// ErrNoServersAvailable is returned when no game servers can accept a session.
+var ErrNoServersAvailable = fmt.Errorf("no gameservers available")
 
-// Fleet monitors a collection of GameServers and handles session creation
+// Fleet monitors a collection of GameServers and handles session creation.
 type Fleet struct {
 	servers        []*server
 	client         *http.Client
 	sessionTimeout time.Duration
 }
 
-// Keep track of a single game server
+// Keep track of a single game server.
 type server struct {
 	url url.URL
 	// retryAt is set when we either see a network error, or the gameserver is
@@ -37,6 +38,7 @@ type server struct {
 	retryAt *time.Time
 }
 
+// NewFleet creates a Fleet from the given server URLs.
 func NewFleet(urls []*url.URL, sessionTimeout time.Duration) *Fleet {
 	var servers []*server
 	for _, url := range urls {
@@ -58,12 +60,14 @@ func NewFleet(urls []*url.URL, sessionTimeout time.Duration) *Fleet {
 	}
 }
 
+// SessionInfo describes an active game session on a server.
 type SessionInfo struct {
 	Server    url.URL
 	SessionID internal.SessionID
 	Game      game.Kind
 }
 
+// CreateSession creates a new game session on an available server.
 func (f *Fleet) CreateSession(kind game.Kind) (*SessionInfo, error) {
 	// gather candidates
 	var candidates []*server
@@ -75,7 +79,7 @@ func (f *Fleet) CreateSession(kind game.Kind) (*SessionInfo, error) {
 	}
 
 	if len(candidates) == 0 {
-		return nil, NoServersAvailable
+		return nil, ErrNoServersAvailable
 	}
 
 	// randomly shuffle candidates
@@ -121,12 +125,11 @@ func (f *Fleet) CreateSession(kind game.Kind) (*SessionInfo, error) {
 			retryAt := time.Now().Add(FailureTimeout)
 			server.retryAt = &retryAt
 			continue
-		} else {
-			// all other status's are unexpected errors
-			return nil, fmt.Errorf("unexpected response from gameserver: %s", resp.Status)
 		}
+		// all other statuses are unexpected errors
+		return nil, fmt.Errorf("unexpected response from gameserver: %s", resp.Status)
 	}
 
 	// all servers unavailable
-	return nil, NoServersAvailable
+	return nil, ErrNoServersAvailable
 }

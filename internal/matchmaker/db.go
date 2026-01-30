@@ -6,13 +6,15 @@ import (
 
 	"github.com/antithesishq/aardvark-arena/internal"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/mattn/go-sqlite3" // register sqlite3 driver
 )
 
+// DB wraps an SQLite database for matchmaker persistence.
 type DB struct {
 	db *sqlx.DB
 }
 
+// PlayerModel represents a player row in the database.
 type PlayerModel struct {
 	PlayerID internal.PlayerID
 	Elo      int
@@ -21,6 +23,7 @@ type PlayerModel struct {
 	Draws    int
 }
 
+// SessionModel represents a session row in the database.
 type SessionModel struct {
 	SessionID   internal.SessionID
 	Server      string
@@ -29,7 +32,7 @@ type SessionModel struct {
 	Deadline    time.Time
 	CompletedAt sql.NullTime
 	Cancelled   sql.NullBool
-	WinnerId    sql.Null[internal.PlayerID]
+	WinnerID    sql.Null[internal.PlayerID]
 }
 
 const selectPlayer = `
@@ -44,7 +47,7 @@ const insertPlayer = `
 	RETURNING PlayerID, Elo, Wins, Losses, Draws
 `
 
-// NewTempDB returns a disk-backed database stored at the provided path
+// NewDB returns a disk-backed database stored at the provided path.
 func NewDB(path string) (*DB, error) {
 	db, err := sqlx.Open("sqlite3", path)
 	if err != nil {
@@ -108,6 +111,7 @@ func ensureSchema(conn sqlx.Execer) error {
 	return nil
 }
 
+// GetOrCreatePlayer returns the player with the given ID, creating one if needed.
 func (db *DB) GetOrCreatePlayer(pid internal.PlayerID) (*PlayerModel, error) {
 	tx, err := db.db.Beginx()
 	if err != nil {

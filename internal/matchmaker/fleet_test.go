@@ -37,7 +37,7 @@ func TestFleetSanity(t *testing.T) {
 
 	t.Run("skip unavailable server", func(t *testing.T) {
 		calls := 0
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			calls++
 			if calls == 1 {
 				w.WriteHeader(http.StatusServiceUnavailable)
@@ -62,7 +62,7 @@ func TestFleetSanity(t *testing.T) {
 	})
 
 	t.Run("all servers unavailable", func(t *testing.T) {
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusServiceUnavailable)
 		}))
 		defer srv.Close()
@@ -71,8 +71,8 @@ func TestFleetSanity(t *testing.T) {
 		fleet := NewFleet([]*url.URL{u}, 5*time.Minute)
 
 		_, err := fleet.CreateSession(game.TicTacToe)
-		if err != NoServersAvailable {
-			t.Fatalf("expected NoServersAvailable, got %v", err)
+		if err != ErrNoServersAvailable {
+			t.Fatalf("expected ErrNoServersAvailable, got %v", err)
 		}
 	})
 
@@ -80,8 +80,8 @@ func TestFleetSanity(t *testing.T) {
 		fleet := NewFleet(nil, 5*time.Minute)
 
 		_, err := fleet.CreateSession(game.TicTacToe)
-		if err != NoServersAvailable {
-			t.Fatalf("expected NoServersAvailable, got %v", err)
+		if err != ErrNoServersAvailable {
+			t.Fatalf("expected ErrNoServersAvailable, got %v", err)
 		}
 	})
 }

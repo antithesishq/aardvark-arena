@@ -64,9 +64,10 @@ func (s *Server) routes() {
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
-	w.Write([]byte("ok"))
+	_, _ = w.Write([]byte("ok"))
 }
 
+// QueueRequest is the JSON body for the queue endpoint.
 type QueueRequest struct {
 	Game *game.Kind
 }
@@ -94,9 +95,10 @@ func (s *Server) handleQueue(w http.ResponseWriter, r *http.Request) {
 	}
 	if info == nil {
 		w.WriteHeader(http.StatusAccepted)
-		w.Write([]byte("queued"))
+		_, _ = w.Write([]byte("queued"))
+		return
 	}
-	internal.RespondJSON(w, info)
+	_ = internal.RespondJSON(w, info)
 }
 
 func (s *Server) handleUnqueue(w http.ResponseWriter, r *http.Request) {
@@ -106,5 +108,5 @@ func (s *Server) handleUnqueue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.queue.Unqueue(pid)
-	w.Write([]byte("ok"))
+	_, _ = w.Write([]byte("ok"))
 }
