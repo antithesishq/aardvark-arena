@@ -1,0 +1,23 @@
+x-auth-token: &auth-token
+  AUTH_TOKEN: d4f5a1b2-0e3c-4a6d-9f8b-7c2e1d3a5b6f
+
+services:
+  matchmaker:
+    build: .
+    command:
+      - sh
+      - -c
+      - matchmaker -addr=:8080 -key=$$AUTH_TOKEN -gameserver=http://gameserver:8081
+    environment:
+      <<: *auth-token
+
+  gameserver:
+    build: .
+    command:
+      - sh
+      - -c
+      - gameserver -addr=:8081 -token=$$AUTH_TOKEN -matchmaker=http://matchmaker:8080
+    environment:
+      <<: *auth-token
+    deploy:
+      replicas: 3

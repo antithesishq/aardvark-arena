@@ -3,6 +3,8 @@ package internal
 import (
 	"fmt"
 	"net/url"
+
+	"github.com/google/uuid"
 )
 
 // URLList is a flag.Value that collects multiple URL flags.
@@ -30,6 +32,17 @@ func URLParser(out *url.URL) func(string) error {
 			return err
 		}
 		*out = *parsed
+		return nil
+	}
+}
+
+func UUIDParser(out *uuid.UUID) func(string) error {
+	return func(raw string) error {
+		parsed, err := uuid.Parse(raw)
+		if err != nil {
+			return err
+		}
+		*out = parsed
 		return nil
 	}
 }
