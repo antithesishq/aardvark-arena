@@ -64,6 +64,70 @@ func TestDBSanity(t *testing.T) {
 	})
 }
 
+func TestCancelExpiredSessions(t *testing.T) {
+	db := MustDB(t)
+	p1 := uuid.New()
+	p2 := uuid.New()
+	for _, pid := range []internal.PlayerID{p1, p2} {
+		if _, err := db.GetOrCreatePlayer(pid); err != nil {
+			t.Fatalf("create player: %v", err)
+		}
+	}
+
+	server, _ := url.Parse("http://localhost:8080")
+
+	// Create a session with an already-expired deadline.
+	expired := uuid.New()
+	if _, err := db.CreateSession(expired, p1, p2, server, game.TicTacToe, time.Now().Add(-time.Second)); err != nil {
+		t.Fatalf("CreateSession (expired): %v", err)
+	}
+
+	// Create a session with a future deadline that should not be cancelled.
+	active := uuid.New()
+	p3, p4 := uuid.New(), uuid.New()
+	for _, pid := range []internal.PlayerID{p3, p4} {
+		if _, err := db.GetOrCreatePlayer(pid); err != nil {
+			t.Fatalf("create player: %v", err)
+		}
+	}
+	if _, err := db.CreateSession(active, p3, p4, server, game.TicTacToe, time.Now().Add(5*time.Minute)); err != nil {
+		t.Fatalf("CreateSession (active): %v", err)
+	}
+
+	// Run the session monitor's inner function.
+	var cancelled []internal.SessionID
+	db.cancelExpiredSessions(func(sid internal.SessionID) {
+		cancelled = append(cancelled, sid)
+	})
+
+	// Only the expired session should have been cancelled.
+	if len(cancelled) != 1 || cancelled[0] != expired {
+		t.Fatalf("expected [%s] cancelled, got %v", expired, cancelled)
+	}
+
+	// Verify players in the expired session have unchanged stats and ELO.
+	gotP1, _ := db.GetOrCreatePlayer(p1)
+	gotP2, _ := db.GetOrCreatePlayer(p2)
+	if gotP1.Elo != internal.DefaultElo || gotP2.Elo != internal.DefaultElo {
+		t.Errorf("expected default elo, got p1=%d p2=%d", gotP1.Elo, gotP2.Elo)
+	}
+	if gotP1.Wins != 0 || gotP1.Losses != 0 || gotP1.Draws != 0 {
+		t.Errorf("p1: expected 0/0/0, got %d/%d/%d", gotP1.Wins, gotP1.Losses, gotP1.Draws)
+	}
+	if gotP2.Wins != 0 || gotP2.Losses != 0 || gotP2.Draws != 0 {
+		t.Errorf("p2: expected 0/0/0, got %d/%d/%d", gotP2.Wins, gotP2.Losses, gotP2.Draws)
+	}
+
+	// Running again should be a no-op since the expired session is now completed.
+	cancelled = nil
+	db.cancelExpiredSessions(func(sid internal.SessionID) {
+		cancelled = append(cancelled, sid)
+	})
+	if len(cancelled) != 0 {
+		t.Errorf("expected no sessions cancelled on second run, got %v", cancelled)
+	}
+}
+
 func TestReportSessionResult(t *testing.T) {
 	var (
 		p1 = uuid.New()

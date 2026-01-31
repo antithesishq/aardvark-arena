@@ -13,11 +13,6 @@ import (
 	_ "github.com/mattn/go-sqlite3" // register sqlite3 driver
 )
 
-// DB wraps an SQLite database for matchmaker persistence.
-type DB struct {
-	db *sqlx.DB
-}
-
 // PlayerModel represents a player row in the database.
 type PlayerModel struct {
 	PlayerID internal.PlayerID `db:"player_id"`
@@ -71,6 +66,16 @@ const insertPlayerSession = `
 	INSERT INTO player_session (player_id, session_id)
 	VALUES (?, ?)
 `
+
+const selectExpiredSessions = `
+	SELECT session_id FROM sessions
+	WHERE deadline < ? AND completed_at IS NULL
+`
+
+// DB wraps an SQLite database for matchmaker persistence.
+type DB struct {
+	db *sqlx.DB
+}
 
 // NewDB returns a disk-backed database stored at the provided path.
 func NewDB(path string) (*DB, error) {
@@ -134,6 +139,36 @@ func ensureSchema(conn sqlx.Execer) error {
 		return err
 	}
 	return nil
+}
+
+// StartSessionMonitor runs a background goroutine that checks for uncancelled
+// expired sessions to cancel.
+func (db *DB) StartSessionMonitor(interval time.Duration, onCancel func(internal.SessionID)) {
+	go func() {
+		for range time.Tick(interval) {
+			db.cancelExpiredSessions(onCancel)
+		}
+	}()
+}
+
+// cancelExpiredSessions finds and cancels all sessions past their deadline
+// that have not yet been completed.
+func (db *DB) cancelExpiredSessions(onCancel func(internal.SessionID)) {
+	var expired []internal.SessionID
+	err := db.db.Select(&expired, selectExpiredSessions, time.Now())
+	if err != nil {
+		log.Printf("session monitor: query failed: %v", err)
+		return
+	}
+	for _, sid := range expired {
+		err := db.ReportSessionResult(sid, true, uuid.Nil)
+		if err != nil {
+			log.Printf("session monitor: cancel session %s: %v", sid, err)
+			continue
+		}
+		onCancel(sid)
+		log.Printf("session monitor: cancelled expired session %s", sid)
+	}
 }
 
 // GetOrCreatePlayer returns the player with the given ID, creating one if needed.

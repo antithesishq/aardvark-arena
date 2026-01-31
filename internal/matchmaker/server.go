@@ -18,6 +18,9 @@ type Config struct {
 	// How frequently will the match queue be checked for matches
 	MatchInterval time.Duration
 
+	// How frequently will the database be checked for expired sessions
+	SessionMonitorInterval time.Duration
+
 	// GameServers is the list of available game server URLs to route to.
 	GameServers []*url.URL
 
@@ -51,6 +54,7 @@ func New(cfg Config) (*Server, error) {
 	}
 	s.routes()
 	s.queue.StartMatcher(cfg.MatchInterval)
+	s.db.StartSessionMonitor(cfg.SessionMonitorInterval, s.queue.Untrack)
 	return s, nil
 }
 

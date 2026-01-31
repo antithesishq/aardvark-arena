@@ -102,7 +102,7 @@ func (q *MatchQueue) publishMatch(session *SessionInfo, a, b *candidate) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	// it's possible that a or b left the queue while we were building matches, if
+	// it's possible that a or b left the queue while we started the session, if
 	// this happens leave the other candidate in the queue, they will be matched
 	// in the next cycle, and the erroneous game session will eventually timeout
 	_, hasA := q.queued[a.pid]

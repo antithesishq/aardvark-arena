@@ -2,6 +2,7 @@
 package gameserver
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"net/url"
@@ -117,7 +118,10 @@ func (s *Server) handleSessionConnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: connect websocket to session handle
 	log.Printf("player %s connecting to session %s", pid, sid)
-	_ = conn.Close(websocket.StatusNormalClosure, "not implemented")
+	err = s.sessions.JoinSession(pid, sid, conn)
+	if err != nil {
+		conn.Close(websocket.StatusInternalError, fmt.Sprintf("failed to join session: %v", err))
+		return
+	}
 }

@@ -15,6 +15,7 @@ import (
 
 var DefaultSessionTimeout = 5 * time.Minute
 var DefaultMatchInterval = time.Second
+var DefaultSessionMonitorInterval = 5 * time.Second
 var DefaultGameServer = "http://localhost:8081"
 
 func main() {
@@ -24,6 +25,7 @@ func main() {
 	addr := flag.String("addr", ":8080", "server listen address")
 	sessionTimeout := flag.Duration("session-timeout", DefaultSessionTimeout, "duration after which unfinished sessions are cancelled")
 	matchInterval := flag.Duration("match-interval", DefaultMatchInterval, "interval between checking the match queue")
+	sessionMonitorInterval := flag.Duration("monitor-interval", DefaultSessionMonitorInterval, "interval between checking for expired sessions")
 	flag.Var(&gameServers, "gameserver", "gameserver URL (can be repeated)")
 	var token internal.Token
 	flag.Var(&token, "key", "token for authenticating gameserver requests")
@@ -38,11 +40,12 @@ func main() {
 	}
 
 	cfg := matchmaker.Config{
-		SessionTimeout: *sessionTimeout,
-		MatchInterval:  *matchInterval,
-		GameServers:    gameServers,
-		Token:          token,
-		DatabasePath:   *databasePath,
+		SessionTimeout:         *sessionTimeout,
+		MatchInterval:          *matchInterval,
+		SessionMonitorInterval: *sessionMonitorInterval,
+		GameServers:            gameServers,
+		Token:                  token,
+		DatabasePath:           *databasePath,
 	}
 	srv, err := matchmaker.New(cfg)
 	if err != nil {

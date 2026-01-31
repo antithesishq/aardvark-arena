@@ -93,6 +93,22 @@ func (s *SessionManager) CreateSession(sid internal.SessionID, game game.Kind, d
 	return nil
 }
 
+func (s *SessionManager) JoinSession(pid internal.PlayerID, sid internal.SessionID, conn *websocket.Conn) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	handle, ok := s.sessions[sid]
+	if !ok {
+		return fmt.Errorf("session %s does not exist", sid)
+	}
+	if handle.IsFinished() {
+		return fmt.Errorf("session %s is already finished", sid)
+	}
+
+	handle.Join(pid, conn)
+	return nil
+}
+
 type sessionHandle struct {
 	sid      internal.SessionID
 	ctx      context.Context
