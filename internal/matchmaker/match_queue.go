@@ -42,23 +42,39 @@ func NewMatchQueue(fleet *Fleet, db *DB) *MatchQueue {
 func (q *MatchQueue) StartMatcher(interval time.Duration) {
 	go func() {
 		for range time.Tick(interval) {
-			q.findMatches()
+			q.matchPlayers()
 		}
 	}()
 }
 
-// findMatches matches as many players as possible currently in the queue.
-func (q *MatchQueue) findMatches() {
+type match struct {
+	a    *candidate
+	b    *candidate
+	game game.Kind
+}
+
+// matchPlayers matches as many players as possible currently in the queue.
+func (q *MatchQueue) matchPlayers() {
+	matches := q.collectMatches()
+
+	// create a new game session for each match
+	for _, match := range matches {
+		session, err := q.fleet.CreateSession(match.game)
+		if err == ErrNoServersAvailable {
+			continue
+		} else if err != nil {
+			log.Panicf("fleet error: %v", err)
+		}
+		q.publishMatch(session, match.a, match.b)
+	}
+}
+
+func (q *MatchQueue) collectMatches() []match {
 	q.mu.Lock()
+	defer q.mu.Unlock()
 
 	if len(q.queued) < 2 {
-		return
-	}
-
-	type match struct {
-		a    *candidate
-		b    *candidate
-		game game.Kind
+		return nil
 	}
 
 	// match players
@@ -82,20 +98,7 @@ func (q *MatchQueue) findMatches() {
 			}
 		}
 	}
-
-	// unlock here so we don't block the main thread while setting up the sessions
-	q.mu.Unlock()
-
-	// create a new game session for each match
-	for _, match := range matches {
-		session, err := q.fleet.CreateSession(match.game)
-		if err == ErrNoServersAvailable {
-			continue
-		} else if err != nil {
-			log.Panicf("fleet error: %v", err)
-		}
-		q.publishMatch(session, match.a, match.b)
-	}
+	return matches
 }
 
 func (q *MatchQueue) publishMatch(session *SessionInfo, a, b *candidate) {
@@ -114,7 +117,7 @@ func (q *MatchQueue) publishMatch(session *SessionInfo, a, b *candidate) {
 			b.pid,
 			&session.Server,
 			session.Game,
-			session.Deadline,
+			time.Now().Add(session.Timeout),
 		)
 		if err != nil {
 			log.Panicf("db error: %v", err)

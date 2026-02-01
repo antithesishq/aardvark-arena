@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/antithesishq/aardvark-arena/internal"
@@ -73,8 +74,8 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 
 // CreateSessionRequest is the request body for creating a new game session.
 type CreateSessionRequest struct {
-	Game     game.Kind
-	Deadline time.Time
+	Game    game.Kind
+	Timeout time.Duration
 }
 
 func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
@@ -88,9 +89,11 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 		internal.WriteError(w, http.StatusBadRequest, err)
 		return
 	}
-	err = s.sessions.CreateSession(sid, body.Game, body.Deadline)
+	deadline := time.Now().Add(body.Timeout)
+	err = s.sessions.CreateSession(sid, body.Game, deadline)
 	if e, ok := err.(*ErrMaxSessions); ok {
-		w.Header().Add("Retry-After", e.RetryAt.Format(time.RFC1123))
+		retrySeconds := strconv.Itoa(int(time.Until(e.RetryAt).Seconds()))
+		w.Header().Add("Retry-After", retrySeconds)
 		internal.WriteError(w, http.StatusServiceUnavailable, err)
 		return
 	} else if err != nil {

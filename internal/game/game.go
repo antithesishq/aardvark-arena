@@ -59,6 +59,23 @@ func (s Status) IsTerminal() bool {
 	return s != Active
 }
 
+func (s Status) String() string {
+	switch s {
+	case Active:
+		return "Active"
+	case P1Win:
+		return "P1Win"
+	case P2Win:
+		return "P2Win"
+	case Draw:
+		return "Draw"
+	case Cancelled:
+		return "Cancelled"
+	default:
+		return "Unknown"
+	}
+}
+
 // Kind identifies the type of game.
 type Kind string
 
@@ -105,6 +122,21 @@ type Position struct {
 	X int
 	// Y is the row index.
 	Y int
+}
+
+// MarshalText implements encoding.TextMarshaler so Position can be used as
+// a JSON map key (e.g. map[Position]AttackResult in Battleship).
+func (p Position) MarshalText() ([]byte, error) {
+	return fmt.Appendf(nil, "%d,%d", p.X, p.Y), nil
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (p *Position) UnmarshalText(text []byte) error {
+	n, err := fmt.Sscanf(string(text), "%d,%d", &p.X, &p.Y)
+	if n != 2 {
+		return fmt.Errorf("invalid position format")
+	}
+	return err
 }
 
 // InBounds returns true if the position is within the given bounds.

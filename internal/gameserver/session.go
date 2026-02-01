@@ -120,12 +120,7 @@ type sessionHandle struct {
 }
 
 func (h *sessionHandle) IsFinished() bool {
-	select {
-	case <-h.ctx.Done():
-		return true
-	default:
-		return false
-	}
+	return h.ctx.Err() != nil
 }
 
 // Starts a goroutine.
@@ -185,31 +180,33 @@ func (h *sessionHandle) Join(pid internal.PlayerID, conn *websocket.Conn) {
 	// This goroutine will also be cancelled when the session finishes.
 	ctx, cancel := context.WithCancel(h.ctx)
 
-	// This goroutine reads messages from the ws
+	// This goroutine reads moves from the ws
 	go func() {
 		defer cancel()
-		var move json.RawMessage
-		err := wsjson.Read(ctx, conn, &move)
-		if err != nil {
-			_ = conn.Close(4000, "failed to read JSON")
-			return
-		}
-		h.inbox <- inboxMsg{
-			pid:  pid,
-			move: move,
+		for {
+			var move json.RawMessage
+			if err := wsjson.Read(ctx, conn, &move); err != nil {
+				return
+			}
+			h.inbox <- inboxMsg{
+				pid:  pid,
+				move: move,
+			}
 		}
 	}()
 
 	// This goroutine writes messages to the ws
 	go func() {
 		defer cancel()
+
+	outer:
 		for {
 			select {
 			case <-ctx.Done():
-				return
+				break outer
 			case state, ok := <-stateCh:
 				if !ok {
-					return
+					break outer
 				}
 				err := wsjson.Write(ctx, conn, state)
 				if err != nil {
@@ -218,5 +215,16 @@ func (h *sessionHandle) Join(pid internal.PlayerID, conn *websocket.Conn) {
 				}
 			}
 		}
+
+		// flush any remaining state messages to the player before exiting
+		for state := range stateCh {
+			err := wsjson.Write(ctx, conn, state)
+			if err != nil {
+				_ = conn.Close(websocket.StatusInternalError, "failed to write JSON")
+				return
+			}
+		}
+
+		_ = conn.Close(websocket.StatusNormalClosure, "finished")
 	}()
 }

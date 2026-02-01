@@ -64,6 +64,6 @@ func (r *Reporter) submitResult(result resultMsg) {
 		}
 	}
 	if err != nil {
-		log.Panicf("failed to submit result for session %s: %v", result.sid, err)
+		log.Printf("failed to submit result for session %s: %v", result.sid, err)
 	}
 }

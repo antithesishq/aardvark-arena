@@ -93,6 +93,7 @@ func (p *Protocol[M, S]) report(status game.Status) {
 	case game.P2Win:
 		winner = p.playerToID(game.P2)
 	}
+	log.Printf("session %s ended: status=%s winner=%s", p.sid, status, winner)
 	p.result <- resultMsg{
 		sid:       p.sid,
 		cancelled: status == game.Cancelled,
@@ -105,17 +106,18 @@ func (p *Protocol[M, S]) RunToCompletion() {
 	timer := time.NewTimer(time.Until(p.deadline))
 	defer timer.Stop()
 
+outer:
 	for {
 		select {
 		case <-timer.C:
 			p.report(game.Cancelled)
-			return
+			break outer
 		case <-p.turnTimer.C:
 			p.report(p.state.CurrentPlayer.Opponent().Wins())
-			return
+			break outer
 		case msg, ok := <-p.inbox:
 			if !ok {
-				return
+				break outer
 			}
 			if msg.conn != nil && msg.move != nil {
 				log.Fatal("BUG: both move and conn are set")
@@ -126,9 +128,14 @@ func (p *Protocol[M, S]) RunToCompletion() {
 			}
 			if p.state.Status.IsTerminal() {
 				p.report(p.state.Status)
-				return
+				break outer
 			}
 		}
+	}
+
+	// close player conns before finishing the protocol
+	for _, pc := range p.players {
+		close(pc.conn)
 	}
 }
 
@@ -136,7 +143,7 @@ func (p *Protocol[M, S]) handleConn(pid internal.PlayerID, conn chan<- PlayerMsg
 	if existing, ok := p.players[pid]; ok {
 		// if existing, replace
 		close(existing.conn)
-		existing.conn = conn
+		p.players[pid] = playerConn{player: existing.player, conn: conn}
 	} else if len(p.players) == 0 {
 		// first player to connect is P1
 		p.players[pid] = playerConn{

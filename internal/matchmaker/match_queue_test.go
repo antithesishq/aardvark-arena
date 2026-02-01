@@ -60,7 +60,7 @@ func TestMatchQueueSanity(t *testing.T) {
 		}
 
 		// Run the matcher
-		q.findMatches()
+		q.matchPlayers()
 
 		// Both players should now see a session
 		s1, err := q.Queue(p1, &game.AllGames[0])
@@ -93,7 +93,7 @@ func TestMatchQueueSanity(t *testing.T) {
 			t.Fatalf("queue p2: %v", err)
 		}
 
-		q.findMatches()
+		q.matchPlayers()
 
 		s1, _ := q.Queue(p1, &game.AllGames[0])
 		s2, _ := q.Queue(p2, &game.AllGames[0])

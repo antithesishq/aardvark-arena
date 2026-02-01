@@ -83,6 +83,11 @@ func NewDB(path string) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
+	if path == ":memory:" {
+		// SQLite only supports a single writer, and in-memory databases are
+		// per-connection. Force a single connection to avoid these issues.
+		db.SetMaxOpenConns(1)
+	}
 	err = ensureSchema(db)
 	return &DB{db: db}, err
 }

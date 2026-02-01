@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 	"time"
 
@@ -58,8 +59,8 @@ func TestServerSanity(t *testing.T) {
 		})
 		sid := uuid.New()
 		body, err := internal.EncodeJSON(CreateSessionRequest{
-			Game:     game.TicTacToe,
-			Deadline: time.Now().Add(5 * time.Minute),
+			Game:    game.TicTacToe,
+			Timeout: 5 * time.Minute,
 		})
 		if err != nil {
 			t.Fatalf("failed to encode body: %v", err)
@@ -79,16 +80,16 @@ func TestServerSanity(t *testing.T) {
 	})
 
 	t.Run("sessions full", func(t *testing.T) {
+		sessionTimeout := 5 * time.Minute
 		srv := New(Config{
 			TurnTimeout: 30 * time.Second,
 			MaxSessions: 1,
 		})
 
 		sid := uuid.New()
-		deadline := time.Now().Add(5 * time.Minute).Round(time.Second)
 		body, err := internal.EncodeJSON(CreateSessionRequest{
-			Game:     game.TicTacToe,
-			Deadline: deadline,
+			Game:    game.TicTacToe,
+			Timeout: sessionTimeout,
 		})
 		if err != nil {
 			t.Fatalf("failed to encode body: %v", err)
@@ -102,8 +103,8 @@ func TestServerSanity(t *testing.T) {
 		// second request should fail due to MaxSessions
 		sid = uuid.New()
 		body, err = internal.EncodeJSON(CreateSessionRequest{
-			Game:     game.TicTacToe,
-			Deadline: time.Now().Add(5 * time.Minute),
+			Game:    game.TicTacToe,
+			Timeout: sessionTimeout,
 		})
 		if err != nil {
 			t.Fatalf("failed to encode body: %v", err)
@@ -117,12 +118,12 @@ func TestServerSanity(t *testing.T) {
 		if rec.Code != http.StatusServiceUnavailable {
 			t.Fatalf("expected status 503, got %d: %s", rec.Code, rec.Body.String())
 		}
-		retryAfter, err := time.Parse(time.RFC1123, rec.Header().Get("Retry-After"))
+		retryAfterSecs, err := strconv.Atoi(rec.Header().Get("Retry-After"))
 		if err != nil {
 			t.Fatal("failed to parse retry-after")
 		}
-		if retryAfter != deadline {
-			t.Fatalf("incorrect retry-after deadline; got=%q; expected=%q", retryAfter, deadline)
+		if retryAfterSecs != int(sessionTimeout.Seconds()) {
+			t.Fatalf("incorrect retry-after deadline; got=%d; expected=%d", retryAfterSecs, int(sessionTimeout.Seconds()))
 		}
 
 		CheckHealth(t, srv, 1)

@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/antithesishq/aardvark-arena/internal"
@@ -57,7 +58,7 @@ type SessionInfo struct {
 	Server    url.URL
 	SessionID internal.SessionID
 	Game      game.Kind
-	Deadline  time.Time
+	Timeout   time.Duration
 }
 
 // CreateSession creates a new game session on an available server.
@@ -80,10 +81,9 @@ func (f *Fleet) CreateSession(kind game.Kind) (*SessionInfo, error) {
 		candidates[i], candidates[j] = candidates[j], candidates[i]
 	})
 
-	deadline := time.Now().Add(f.sessionTimeout)
 	body, err := internal.EncodeJSON(gameserver.CreateSessionRequest{
-		Game:     kind,
-		Deadline: deadline,
+		Game:    kind,
+		Timeout: f.sessionTimeout,
 	})
 	if err != nil {
 		return nil, err
@@ -115,11 +115,17 @@ func (f *Fleet) CreateSession(kind game.Kind) (*SessionInfo, error) {
 				Server:    server.url,
 				SessionID: sid,
 				Game:      kind,
-				Deadline:  deadline,
+				Timeout:   f.sessionTimeout,
 			}, nil
 		} else if resp.StatusCode == http.StatusServiceUnavailable {
-			retryAt := time.Now().Add(FailureTimeout)
-			server.retryAt = &retryAt
+			retryAfterSecs, err := strconv.Atoi(resp.Header.Get("Retry-After"))
+			if err == nil {
+				retryAt := time.Now().Add(time.Second * time.Duration(retryAfterSecs))
+				server.retryAt = &retryAt
+			} else {
+				retryAt := time.Now().Add(FailureTimeout)
+				server.retryAt = &retryAt
+			}
 			continue
 		}
 		// all other statuses are unexpected errors
