@@ -150,7 +150,7 @@ type Session[Move any, Shared any] interface {
 
 // Ai defines the interface for an AI that can generate moves.
 type Ai[Move any, Shared any] interface {
-	GetMove(Shared) (Move, error)
+	GetMove(Player, Shared) (Move, error)
 }
 
 // PlayerMap is a generic map-like structure for storing values per player.

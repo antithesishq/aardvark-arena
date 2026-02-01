@@ -5,7 +5,7 @@ import (
 )
 
 func TestAiHuntsAdjacentToHits(t *testing.T) {
-	ai := NewBattleshipAi(P1)
+	ai := NewBattleshipAi()
 	ai.setup = true // Skip setup phase
 
 	// Create state with a single hit in the middle of the board
@@ -21,7 +21,7 @@ func TestAiHuntsAdjacentToHits(t *testing.T) {
 	}
 
 	// The AI should always pick one of the adjacend empty cells
-	move, err := ai.GetMove(state)
+	move, err := ai.GetMove(P1, state)
 	if err != nil {
 		t.Fatalf("GetMove failed: %v", err)
 	}
@@ -34,7 +34,7 @@ func TestAiHuntsAdjacentToHits(t *testing.T) {
 }
 
 func TestAiFallsBackToRandomWhenNoAdjacentUnknown(t *testing.T) {
-	ai := NewBattleshipAi(P1)
+	ai := NewBattleshipAi()
 	ai.setup = true
 
 	// Create state with a hit and all adjacent cells explored
@@ -56,7 +56,7 @@ func TestAiFallsBackToRandomWhenNoAdjacentUnknown(t *testing.T) {
 		{X: 6, Y: 5}: true,
 	}
 
-	move, err := ai.GetMove(state)
+	move, err := ai.GetMove(P1, state)
 	if err != nil {
 		t.Fatalf("GetMove failed: %v", err)
 	}

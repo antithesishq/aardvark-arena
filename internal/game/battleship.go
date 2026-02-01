@@ -218,22 +218,21 @@ func (s *BattleshipSession) handleAttack(state State[BattleshipSharedState], pla
 
 // BattleshipAi implements Ai for Battleship.
 type BattleshipAi struct {
-	player Player
-	setup  bool
+	setup bool
 }
 
 // NewBattleshipAi creates a new Battleship AI for the given player.
-func NewBattleshipAi(player Player) *BattleshipAi {
-	return &BattleshipAi{player: player}
+func NewBattleshipAi() *BattleshipAi {
+	return &BattleshipAi{}
 }
 
 // GetMove returns the AI's chosen move for the current state.
-func (ai *BattleshipAi) GetMove(state BattleshipSharedState) (BattleshipMove, error) {
+func (ai *BattleshipAi) GetMove(player Player, state BattleshipSharedState) (BattleshipMove, error) {
 	if !ai.setup {
 		ai.setup = true
 		return ai.getSetupMove()
 	}
-	return ai.getAttackMove(state)
+	return ai.getAttackMove(player, state)
 }
 
 func (ai *BattleshipAi) getSetupMove() (BattleshipMove, error) {
@@ -287,9 +286,9 @@ func (ai *BattleshipAi) getSetupMove() (BattleshipMove, error) {
 	return BattleshipMove{Kind: SetupMoveKind, Placements: placements}, nil
 }
 
-func (ai *BattleshipAi) getAttackMove(state BattleshipSharedState) (BattleshipMove, error) {
+func (ai *BattleshipAi) getAttackMove(player Player, state BattleshipSharedState) (BattleshipMove, error) {
 	// Attacks on the opponent represent our previous attacks
-	opponentBoard := state.Attacks.Get(ai.player.Opponent())
+	opponentBoard := state.Attacks.Get(player.Opponent())
 
 	// First, look for untargeted cells adjacent to previous hits
 	adjacentOffsets := []Position{{X: 0, Y: -1}, {X: 0, Y: 1}, {X: -1, Y: 0}, {X: 1, Y: 0}}

@@ -174,7 +174,7 @@ func (h *sessionHandle) RunToCompletion(g game.Kind, deadline time.Time, turnTim
 // Join a player to a session.
 func (h *sessionHandle) Join(pid internal.PlayerID, conn *websocket.Conn) {
 	// Send connection request to session protocol.
-	stateCh := make(chan StateOrErr, 1)
+	stateCh := make(chan PlayerMsg, 1)
 	h.inbox <- inboxMsg{
 		pid:  pid,
 		conn: stateCh,

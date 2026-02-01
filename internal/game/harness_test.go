@@ -25,7 +25,7 @@ func RunGame[Move any, Shared any](
 		ai := ais.Get(state.CurrentPlayer)
 
 		// Get the AI's move
-		move, err := ai.GetMove(state.Shared)
+		move, err := ai.GetMove(state.CurrentPlayer, state.Shared)
 		if err != nil {
 			return state, fmt.Errorf("player %d AI failed to get move: %w", state.CurrentPlayer, err)
 		}
@@ -46,8 +46,8 @@ func TestTicTacToeHarness(t *testing.T) {
 		initialState := NewState(NewTicTacToeBoard())
 		session := &TicTacToeSession{}
 		ais := PlayerMap[Ai[Position, TicTacToeBoard]]{
-			P1: NewTicTacToeAi(P1),
-			P2: NewTicTacToeAi(P2),
+			P1: NewTicTacToeAi(),
+			P2: NewTicTacToeAi(),
 		}
 		finalState, err := RunGame(initialState, session, ais)
 
@@ -67,8 +67,8 @@ func TestBattleshipHarness(t *testing.T) {
 		initialState := NewState(NewBattleshipSharedState())
 		session := NewBattleshipSession()
 		ais := PlayerMap[Ai[BattleshipMove, BattleshipSharedState]]{
-			P1: NewBattleshipAi(P1),
-			P2: NewBattleshipAi(P2),
+			P1: NewBattleshipAi(),
+			P2: NewBattleshipAi(),
 		}
 		finalState, err := RunGame(initialState, session, ais)
 
@@ -88,8 +88,8 @@ func TestConnect4Harness(t *testing.T) {
 		initialState := NewState(NewConnect4Board())
 		session := &Connect4Session{}
 		ais := PlayerMap[Ai[int, Connect4Board]]{
-			P1: NewConnect4Ai(P1),
-			P2: NewConnect4Ai(P2),
+			P1: NewConnect4Ai(),
+			P2: NewConnect4Ai(),
 		}
 		finalState, err := RunGame(initialState, session, ais)
 

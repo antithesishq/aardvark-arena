@@ -4,10 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"log"
-	"net"
 	"net/http"
 	"net/url"
-	"time"
 
 	"github.com/antithesishq/aardvark-arena/internal"
 )
@@ -21,20 +19,11 @@ type Reporter struct {
 }
 
 func NewReporter(resultCh chan resultMsg, token internal.Token, matchmaker *url.URL) *Reporter {
-	client := &http.Client{
-		Transport: &http.Transport{
-			DialContext: (&net.Dialer{
-				Timeout:   5 * time.Second,
-				KeepAlive: 60 * time.Second,
-			}).DialContext,
-			TLSHandshakeTimeout: 5 * time.Second,
-		},
-	}
 	return &Reporter{
 		resultCh:      resultCh,
 		token:         token,
 		matchmakerURL: matchmaker,
-		client:        client,
+		client:        internal.NewHttpClient(),
 	}
 }
 

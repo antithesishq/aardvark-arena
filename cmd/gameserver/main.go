@@ -21,8 +21,8 @@ func main() {
 	maxSessions := flag.Int("max-sessions", 100, "maximum concurrent sessions")
 	var token internal.Token
 	flag.Var(&token, "token", "token for authenticating with matchmaker")
-	var matchmakerURL *url.URL
-	flag.Func("matchmaker", "matchmaker base URL", internal.URLParser(matchmakerURL))
+	var matchmakerURL url.URL
+	flag.Func("matchmaker", "matchmaker base URL", internal.URLParser(&matchmakerURL))
 	flag.Parse()
 
 	log.Println("starting gameserver...")
@@ -30,7 +30,7 @@ func main() {
 	cfg := gameserver.Config{
 		TurnTimeout:   *turnTimeout,
 		MaxSessions:   *maxSessions,
-		MatchmakerURL: matchmakerURL,
+		MatchmakerURL: &matchmakerURL,
 		Token:         token,
 	}
 	srv := gameserver.New(cfg)

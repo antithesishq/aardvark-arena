@@ -11,10 +11,11 @@ import (
 	"github.com/google/uuid"
 )
 
-// StateOrErr holds either a game state or an error message.
-type StateOrErr struct {
-	State json.RawMessage
-	Error string
+// PlayerMsg holds either a game state or an error message.
+type PlayerMsg struct {
+	Player game.Player
+	State  json.RawMessage
+	Error  string
 }
 
 type inboxMsg struct {
@@ -22,12 +23,12 @@ type inboxMsg struct {
 
 	// one of move or conn must be nil
 	move json.RawMessage
-	conn chan<- StateOrErr
+	conn chan<- PlayerMsg
 }
 
 type playerConn struct {
 	player game.Player
-	conn   chan<- StateOrErr
+	conn   chan<- PlayerMsg
 }
 
 // resultMsg represents the outcome of a game session.
@@ -131,7 +132,7 @@ func (p *Protocol[M, S]) RunToCompletion() {
 	}
 }
 
-func (p *Protocol[M, S]) handleConn(pid internal.PlayerID, conn chan<- StateOrErr) {
+func (p *Protocol[M, S]) handleConn(pid internal.PlayerID, conn chan<- PlayerMsg) {
 	if existing, ok := p.players[pid]; ok {
 		// if existing, replace
 		close(existing.conn)
@@ -149,7 +150,7 @@ func (p *Protocol[M, S]) handleConn(pid internal.PlayerID, conn chan<- StateOrEr
 			conn:   conn,
 		}
 	} else {
-		conn <- StateOrErr{Error: "too many players connected"}
+		conn <- PlayerMsg{Error: "too many players connected"}
 	}
 
 	// make sure the new connection sees the latest state
@@ -179,14 +180,6 @@ func (p *Protocol[M, S]) handleMove(pid internal.PlayerID, rawMove json.RawMessa
 	p.BroadcastState()
 }
 
-// TrySend attempts to send a message to a player if they are connected.
-func (p *Protocol[M, S]) TrySend(pid internal.PlayerID, msg StateOrErr) {
-	playerConn, ok := p.players[pid]
-	if ok {
-		playerConn.conn <- msg
-	}
-}
-
 // BroadcastState sends the current game state to all connected players.
 func (p *Protocol[M, S]) BroadcastState() {
 	for pid := range p.players {
@@ -200,10 +193,16 @@ func (p *Protocol[M, S]) SendState(pid internal.PlayerID) {
 	if err != nil {
 		log.Panicf("failed to marshal state: %v", err)
 	}
-	p.TrySend(pid, StateOrErr{State: encodedState})
+	playerConn, ok := p.players[pid]
+	if ok {
+		playerConn.conn <- PlayerMsg{Player: playerConn.player, State: encodedState}
+	}
 }
 
 // SendErr sends an error message to a specific player.
 func (p *Protocol[M, S]) SendErr(pid internal.PlayerID, err error) {
-	p.TrySend(pid, StateOrErr{Error: err.Error()})
+	playerConn, ok := p.players[pid]
+	if ok {
+		playerConn.conn <- PlayerMsg{Player: playerConn.player, Error: err.Error()}
+	}
 }

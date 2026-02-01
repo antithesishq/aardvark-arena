@@ -19,5 +19,19 @@ services:
       - gameserver -addr=:8081 -token=$$AUTH_TOKEN -matchmaker=http://matchmaker:8080
     environment:
       <<: *auth-token
+    depends_on:
+      - matchmaker
     deploy:
       replicas: 3
+
+  player:
+    build: .
+    command:
+      - sh
+      - -c
+      - player -matchmaker=http://matchmaker:8080
+    depends_on:
+      - matchmaker
+      - gameserver
+    deploy:
+      replicas: 4

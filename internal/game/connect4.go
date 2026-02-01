@@ -116,18 +116,16 @@ func (s *Connect4Session) MakeMove(state State[Connect4Board], player Player, co
 }
 
 // Connect4Ai implements Ai for Connect4.
-type Connect4Ai struct {
-	player Player
-}
+type Connect4Ai struct{}
 
 // NewConnect4Ai creates a new Connect4 AI for the given player.
-func NewConnect4Ai(player Player) *Connect4Ai {
-	return &Connect4Ai{player: player}
+func NewConnect4Ai() *Connect4Ai {
+	return &Connect4Ai{}
 }
 
 // GetMove returns the AI's chosen column.
 // Strategy: win if possible, block opponent win, otherwise prefer center columns.
-func (ai *Connect4Ai) GetMove(board Connect4Board) (int, error) {
+func (ai *Connect4Ai) GetMove(player Player, board Connect4Board) (int, error) {
 	validCols := board.validColumns()
 	if len(validCols) == 0 {
 		return 0, fmt.Errorf("no valid moves available")
@@ -136,13 +134,13 @@ func (ai *Connect4Ai) GetMove(board Connect4Board) (int, error) {
 	// Check for winning move
 	for _, col := range validCols {
 		row := board.lowestEmpty(col)
-		if board.checkWinAt(col, row, ai.player) {
+		if board.checkWinAt(col, row, player) {
 			return col, nil
 		}
 	}
 
 	// Check for blocking move
-	opponent := ai.player.Opponent()
+	opponent := player.Opponent()
 	for _, col := range validCols {
 		row := board.lowestEmpty(col)
 		if board.checkWinAt(col, row, opponent) {

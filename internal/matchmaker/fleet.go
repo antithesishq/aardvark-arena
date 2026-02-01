@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"math/rand"
-	"net"
 	"net/http"
 	"net/url"
 	"time"
@@ -45,18 +44,9 @@ func NewFleet(urls []*url.URL, token internal.Token, sessionTimeout time.Duratio
 	for _, url := range urls {
 		servers = append(servers, &server{url: *url})
 	}
-	client := &http.Client{
-		Transport: &http.Transport{
-			DialContext: (&net.Dialer{
-				Timeout:   5 * time.Second,
-				KeepAlive: 60 * time.Second,
-			}).DialContext,
-			TLSHandshakeTimeout: 5 * time.Second,
-		},
-	}
 	return &Fleet{
 		servers:        servers,
-		client:         client,
+		client:         internal.NewHttpClient(),
 		token:          token,
 		sessionTimeout: sessionTimeout,
 	}
@@ -112,12 +102,10 @@ func (f *Fleet) CreateSession(kind game.Kind) (*SessionInfo, error) {
 			req.Header.Set("Authorization", "Bearer "+f.token.String())
 		}
 		resp, err := f.client.Do(req)
-		if urlerr, ok := err.(*url.Error); ok {
-			if urlerr.Temporary() {
-				retryAt := time.Now().Add(FailureTimeout)
-				server.retryAt = &retryAt
-				continue
-			}
+		if internal.HttpIsTemporary(err) {
+			retryAt := time.Now().Add(FailureTimeout)
+			server.retryAt = &retryAt
+			continue
 		}
 		if err != nil {
 			return nil, err

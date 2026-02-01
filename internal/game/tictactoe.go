@@ -125,21 +125,19 @@ func (s *TicTacToeSession) MakeMove(state State[TicTacToeBoard], player Player, 
 
 // TicTacToeAi implements GameAi for TicTacToe.
 // Simple strategy: play into a line with only own tokens, or block a line with 2 opponent tokens, otherwise random.
-type TicTacToeAi struct {
-	player Player
-}
+type TicTacToeAi struct{}
 
 // NewTicTacToeAi creates a new TicTacToe AI for the given player.
-func NewTicTacToeAi(player Player) *TicTacToeAi {
-	return &TicTacToeAi{player: player}
+func NewTicTacToeAi() *TicTacToeAi {
+	return &TicTacToeAi{}
 }
 
 // GetMove returns the AI's chosen move for the current board state.
-func (ai *TicTacToeAi) GetMove(board TicTacToeBoard) (Position, error) {
-	opponent := ai.player.Opponent()
+func (ai *TicTacToeAi) GetMove(player Player, board TicTacToeBoard) (Position, error) {
+	opponent := player.Opponent()
 
 	for _, line := range lines {
-		myCount := board.countOccupiedBy(line, ai.player)
+		myCount := board.countOccupiedBy(line, player)
 		oppCount := board.countOccupiedBy(line, opponent)
 
 		emptyPos := board.firstEmpty(line)
