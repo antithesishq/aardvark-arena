@@ -23,12 +23,12 @@ type inboxMsg struct {
 
 	// one of move or conn must be nil
 	move json.RawMessage
-	conn chan<- PlayerMsg
+	conn chan PlayerMsg
 }
 
 type playerConn struct {
 	player game.Player
-	conn   chan<- PlayerMsg
+	conn   chan PlayerMsg
 }
 
 // resultMsg represents the outcome of a game session.
@@ -94,6 +94,8 @@ func (p *Protocol[M, S]) report(status game.Status) {
 		winner = p.playerToID(game.P2)
 	}
 	log.Printf("session %s ended: status=%s winner=%s", p.sid, status, winner)
+	p.state.Status = status
+	p.BroadcastState()
 	p.result <- resultMsg{
 		sid:       p.sid,
 		cancelled: status == game.Cancelled,
@@ -139,7 +141,7 @@ outer:
 	}
 }
 
-func (p *Protocol[M, S]) handleConn(pid internal.PlayerID, conn chan<- PlayerMsg) {
+func (p *Protocol[M, S]) handleConn(pid internal.PlayerID, conn chan PlayerMsg) {
 	if existing, ok := p.players[pid]; ok {
 		// if existing, replace
 		close(existing.conn)
@@ -194,6 +196,23 @@ func (p *Protocol[M, S]) BroadcastState() {
 	}
 }
 
+// sendLatest sends msg on ch without blocking. If the channel is full,
+// it drains the stale value and retries so the channel holds the newest message.
+func sendLatest[T any](ch chan T, msg T) {
+	select {
+	case ch <- msg:
+	default:
+		select {
+		case <-ch:
+		default:
+		}
+		select {
+		case ch <- msg:
+		default:
+		}
+	}
+}
+
 // SendState sends the current game state to a specific player.
 func (p *Protocol[M, S]) SendState(pid internal.PlayerID) {
 	encodedState, err := json.Marshal(p.state)
@@ -202,14 +221,19 @@ func (p *Protocol[M, S]) SendState(pid internal.PlayerID) {
 	}
 	playerConn, ok := p.players[pid]
 	if ok {
-		playerConn.conn <- PlayerMsg{Player: playerConn.player, State: encodedState}
+		sendLatest(playerConn.conn, PlayerMsg{Player: playerConn.player, State: encodedState})
 	}
 }
 
 // SendErr sends an error message to a specific player.
+// Drops the message if the channel is full to avoid blocking.
 func (p *Protocol[M, S]) SendErr(pid internal.PlayerID, err error) {
 	playerConn, ok := p.players[pid]
 	if ok {
-		playerConn.conn <- PlayerMsg{Player: playerConn.player, Error: err.Error()}
+		msg := PlayerMsg{Player: playerConn.player, Error: err.Error()}
+		select {
+		case playerConn.conn <- msg:
+		default:
+		}
 	}
 }
