@@ -175,56 +175,32 @@ func (h *sessionHandle) Join(pid internal.PlayerID, conn *websocket.Conn) {
 		conn: stateCh,
 	}
 
-	// Create another cancellable context, to ensure that when either connection
-	// goroutine exits, the other one also exits.
-	// This goroutine will also be cancelled when the session finishes.
-	ctx, cancel := context.WithCancel(h.ctx)
-
-	// This goroutine reads moves from the ws
+	// Write goroutine: drains all state messages from the protocol then
+	// closes the websocket. Uses context.Background() so writes are not
+	// interrupted when the session context is cancelled.
 	go func() {
-		defer cancel()
-		for {
-			var move json.RawMessage
-			if err := wsjson.Read(ctx, conn, &move); err != nil {
-				return
-			}
-			h.inbox <- inboxMsg{
-				pid:  pid,
-				move: move,
-			}
-		}
-	}()
-
-	// This goroutine writes messages to the ws
-	go func() {
-		defer cancel()
-
-	outer:
-		for {
-			select {
-			case <-ctx.Done():
-				break outer
-			case state, ok := <-stateCh:
-				if !ok {
-					break outer
-				}
-				err := wsjson.Write(ctx, conn, state)
-				if err != nil {
-					_ = conn.Close(websocket.StatusInternalError, "failed to write JSON")
-					return
-				}
-			}
-		}
-
-		// flush any remaining state messages to the player before exiting
 		for state := range stateCh {
-			err := wsjson.Write(ctx, conn, state)
-			if err != nil {
+			if err := wsjson.Write(context.Background(), conn, state); err != nil {
 				_ = conn.Close(websocket.StatusInternalError, "failed to write JSON")
 				return
 			}
 		}
-
 		_ = conn.Close(websocket.StatusNormalClosure, "finished")
+	}()
+
+	// Read goroutine: reads moves from the websocket until the connection
+	// is closed (by the write goroutine above, or by the player).
+	go func() {
+		for {
+			var move json.RawMessage
+			if err := wsjson.Read(context.Background(), conn, &move); err != nil {
+				return
+			}
+			select {
+			case h.inbox <- inboxMsg{pid: pid, move: move}:
+			case <-h.ctx.Done():
+				return
+			}
+		}
 	}()
 }

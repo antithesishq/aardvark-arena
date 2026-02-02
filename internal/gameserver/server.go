@@ -4,6 +4,7 @@ package gameserver
 import (
 	"fmt"
 	"log"
+	"math"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -92,7 +93,7 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 	deadline := time.Now().Add(body.Timeout)
 	err = s.sessions.CreateSession(sid, body.Game, deadline)
 	if e, ok := err.(*ErrMaxSessions); ok {
-		retrySeconds := strconv.Itoa(int(time.Until(e.RetryAt).Seconds()))
+		retrySeconds := strconv.Itoa(int(math.Ceil(time.Until(e.RetryAt).Seconds())))
 		w.Header().Add("Retry-After", retrySeconds)
 		internal.WriteError(w, http.StatusServiceUnavailable, err)
 		return

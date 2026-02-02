@@ -3,6 +3,7 @@ package gameserver
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -122,7 +123,7 @@ func TestServerSanity(t *testing.T) {
 		if err != nil {
 			t.Fatal("failed to parse retry-after")
 		}
-		if retryAfterSecs != int(sessionTimeout.Seconds()) {
+		if retryAfterSecs != int(math.Ceil(sessionTimeout.Seconds())) {
 			t.Fatalf("incorrect retry-after deadline; got=%d; expected=%d", retryAfterSecs, int(sessionTimeout.Seconds()))
 		}
 

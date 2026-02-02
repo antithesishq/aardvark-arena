@@ -95,7 +95,10 @@ func (s *Session) bridge(ctx context.Context, conn *websocket.Conn) error {
 			select {
 			case <-ctx.Done():
 				return
-			case move := <-s.protocolTx:
+			case move, ok := <-s.protocolTx:
+				if !ok {
+					return
+				}
 				if err := wsjson.Write(ctx, conn, move); err != nil {
 					log.Printf("player %s: write error: %v", s.pid, err)
 					return
