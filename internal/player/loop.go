@@ -44,18 +44,18 @@ func (l *Loop) Run(ctx context.Context) error {
 	sessions := 0
 
 	for ctx.Err() == nil {
+		sessions++
 		session, err := l.waitForMatch(ctx, lastSID)
 		if err != nil {
 			return err
 		}
-		log.Printf("matched: player=%s session=%s game=%s", l.cfg.PlayerID, session.SessionID, session.Game)
+		log.Printf("matched: player=%s session=%s game=%s sessions=%d/%d",
+			l.cfg.PlayerID, session.SessionID, session.Game, sessions, l.cfg.NumSessions)
 		lastSID = session.SessionID
 
 		if err := l.playGame(ctx, session); err != nil {
-			log.Printf("game error: %v", err)
+			log.Printf("player %s: game error: %v", l.cfg.PlayerID, err)
 		}
-		sessions++
-		log.Printf("player %s: game complete: session=%s; sessions=%d/%d", l.cfg.PlayerID, session.SessionID, sessions, l.cfg.NumSessions)
 
 		if sessions >= l.cfg.NumSessions && l.cfg.NumSessions > 0 {
 			log.Printf("reached configured number of sessions (%d); exiting", l.cfg.NumSessions)
@@ -116,6 +116,6 @@ func (l *Loop) playGame(ctx context.Context, info *matchmaker.SessionInfo) error
 	if err != nil {
 		return err
 	}
-	log.Printf("player %s: game finished: status=%s interrupted=%v", l.cfg.PlayerID, completion.Status.String(), completion.Interrupted)
+	log.Printf("player %s: game finished: status=%s interrupted=%v", l.cfg.PlayerID, completion.Status, completion.Interrupted)
 	return nil
 }
