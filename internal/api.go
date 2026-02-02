@@ -21,6 +21,7 @@ type SessionID = uuid.UUID
 // Token authenticates API requests.
 type Token uuid.UUID
 
+// NilToken is the zero-value token.
 var NilToken = Token(uuid.Nil)
 
 // IsNil returns true if the token is nil or the zero UUID.

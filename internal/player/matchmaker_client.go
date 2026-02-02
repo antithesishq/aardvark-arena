@@ -24,7 +24,7 @@ func NewMatchmakerClient(baseURL *url.URL, pid internal.PlayerID) *MatchmakerCli
 	return &MatchmakerClient{
 		url:    baseURL,
 		pid:    pid,
-		client: internal.NewHttpClient(),
+		client: internal.NewHTTPClient(),
 	}
 }
 

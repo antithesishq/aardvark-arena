@@ -7,7 +7,8 @@ import (
 	"time"
 )
 
-func NewHttpClient() *http.Client {
+// NewHTTPClient returns an http.Client with sensible default timeouts.
+func NewHTTPClient() *http.Client {
 	return &http.Client{
 		Transport: &http.Transport{
 			DialContext: (&net.Dialer{
@@ -19,7 +20,8 @@ func NewHttpClient() *http.Client {
 	}
 }
 
-func HttpIsTemporary(err error) bool {
+// HTTPIsTemporary reports whether err is a temporary or timeout URL error.
+func HTTPIsTemporary(err error) bool {
 	if urlerr, ok := err.(*url.Error); ok {
 		return urlerr.Temporary() || urlerr.Timeout()
 	}

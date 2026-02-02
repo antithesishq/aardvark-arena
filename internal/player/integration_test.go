@@ -22,7 +22,7 @@ func must[T any](v T, err error) T {
 	return v
 }
 
-// startGameServer creates a gameserver httptest.Server
+// startGameServer creates a gameserver httptest.Server.
 func startGameServer(t *testing.T, mmURL *url.URL) *httptest.Server {
 	t.Helper()
 	gs := gameserver.New(gameserver.Config{
@@ -35,7 +35,7 @@ func startGameServer(t *testing.T, mmURL *url.URL) *httptest.Server {
 }
 
 // startMatchmaker creates a matchmaker and gameserver, connects them together,
-// and returns the matchmaker url
+// and returns the matchmaker url.
 func startMatchmaker(t *testing.T) *url.URL {
 	t.Helper()
 	var mmHandler http.Handler

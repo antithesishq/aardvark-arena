@@ -117,6 +117,7 @@ func (s *Server) handleUnqueue(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte("ok"))
 }
 
+// ResultRequest is the payload sent by a game server to report a session outcome.
 type ResultRequest struct {
 	Cancelled bool
 	Winner    internal.PlayerID

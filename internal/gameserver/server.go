@@ -125,7 +125,7 @@ func (s *Server) handleSessionConnect(w http.ResponseWriter, r *http.Request) {
 	log.Printf("player %s connecting to session %s", pid, sid)
 	err = s.sessions.JoinSession(pid, sid, conn)
 	if err != nil {
-		conn.Close(websocket.StatusInternalError, fmt.Sprintf("failed to join session: %v", err))
+		_ = conn.Close(websocket.StatusInternalError, fmt.Sprintf("failed to join session: %v", err))
 		return
 	}
 }

@@ -93,6 +93,7 @@ func (s *SessionManager) CreateSession(sid internal.SessionID, game game.Kind, d
 	return nil
 }
 
+// JoinSession adds a player to an existing session over the given websocket.
 func (s *SessionManager) JoinSession(pid internal.PlayerID, sid internal.SessionID, conn *websocket.Conn) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -36,6 +36,7 @@ func URLParser(out *url.URL) func(string) error {
 	}
 }
 
+// UUIDParser returns a flag value parser that writes a UUID into out.
 func UUIDParser(out *uuid.UUID) func(string) error {
 	return func(raw string) error {
 		parsed, err := uuid.Parse(raw)

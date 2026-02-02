@@ -197,6 +197,7 @@ func (db *DB) GetOrCreatePlayer(pid internal.PlayerID) (*PlayerModel, error) {
 	return &p, nil
 }
 
+// CreateSession inserts a new session with the given players and server.
 func (db *DB) CreateSession(
 	sid internal.SessionID,
 	p1 internal.PlayerID,
@@ -232,6 +233,7 @@ func (db *DB) CreateSession(
 	return &s, nil
 }
 
+// ReportSessionResult records the outcome of a finished session.
 func (db *DB) ReportSessionResult(
 	sid internal.SessionID,
 	cancelled bool,

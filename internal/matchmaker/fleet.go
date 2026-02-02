@@ -47,7 +47,7 @@ func NewFleet(urls []*url.URL, token internal.Token, sessionTimeout time.Duratio
 	}
 	return &Fleet{
 		servers:        servers,
-		client:         internal.NewHttpClient(),
+		client:         internal.NewHTTPClient(),
 		token:          token,
 		sessionTimeout: sessionTimeout,
 	}
@@ -102,7 +102,7 @@ func (f *Fleet) CreateSession(kind game.Kind) (*SessionInfo, error) {
 			req.Header.Set("Authorization", "Bearer "+f.token.String())
 		}
 		resp, err := f.client.Do(req)
-		if internal.HttpIsTemporary(err) {
+		if internal.HTTPIsTemporary(err) {
 			retryAt := time.Now().Add(FailureTimeout)
 			server.retryAt = &retryAt
 			continue

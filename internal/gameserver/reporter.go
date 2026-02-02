@@ -10,7 +10,7 @@ import (
 	"github.com/antithesishq/aardvark-arena/internal"
 )
 
-// Reporter sends results back to the matchmaker
+// Reporter sends results back to the matchmaker.
 type Reporter struct {
 	resultCh      chan resultMsg
 	token         internal.Token
@@ -18,15 +18,17 @@ type Reporter struct {
 	client        *http.Client
 }
 
+// NewReporter creates a Reporter that sends results to the given matchmaker URL.
 func NewReporter(resultCh chan resultMsg, token internal.Token, matchmaker *url.URL) *Reporter {
 	return &Reporter{
 		resultCh:      resultCh,
 		token:         token,
 		matchmakerURL: matchmaker,
-		client:        internal.NewHttpClient(),
+		client:        internal.NewHTTPClient(),
 	}
 }
 
+// StartReporter begins processing results in the background.
 func (r *Reporter) StartReporter() {
 	go func() {
 		for result := range r.resultCh {

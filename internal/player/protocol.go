@@ -9,6 +9,7 @@ import (
 	"github.com/antithesishq/aardvark-arena/internal/gameserver"
 )
 
+// Completion holds the result of a finished protocol run.
 type Completion struct {
 	Status      game.Status
 	Interrupted bool
@@ -19,8 +20,6 @@ type Protocol[Move any, Shared any] struct {
 	rx <-chan gameserver.PlayerMsg
 	tx chan<- json.RawMessage
 	ai game.Ai[Move, Shared]
-
-	player game.Player
 }
 
 // NewProtocol creates a Protocol that communicates over the given channels.
@@ -36,8 +35,8 @@ func NewProtocol[M any, S any](
 	}
 }
 
-// Run executes the protocol to completion.
-// Returns the final game status and any error encountered.
+// RunToCompletion executes the protocol to completion.
+// It returns the final game status and any error encountered.
 func (p *Protocol[M, S]) RunToCompletion() (Completion, error) {
 	defer close(p.tx)
 

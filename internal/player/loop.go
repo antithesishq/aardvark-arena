@@ -54,7 +54,7 @@ func (l *Loop) Run(ctx context.Context) error {
 		if err := l.playGame(ctx, session); err != nil {
 			log.Printf("game error: %v", err)
 		}
-		sessions += 1
+		sessions++
 		log.Printf("player %s: game complete: session=%s; sessions=%d/%d", l.cfg.PlayerID, session.SessionID, sessions, l.cfg.NumSessions)
 
 		if sessions >= l.cfg.NumSessions && l.cfg.NumSessions > 0 {
@@ -75,7 +75,7 @@ func (l *Loop) waitForMatch(ctx context.Context, lastSID internal.SessionID) (*m
 		}
 
 		info, err := l.client.Queue(ctx, nil)
-		if internal.HttpIsTemporary(err) {
+		if internal.HTTPIsTemporary(err) {
 			log.Printf("queue error (retrying): %v", err)
 			continue
 		}

@@ -38,7 +38,7 @@ func NewSession(
 	pid internal.PlayerID,
 ) *Session {
 	return &Session{
-		client:     internal.NewHttpClient(),
+		client:     internal.NewHTTPClient(),
 		serverURL:  serverURL,
 		sid:        sid,
 		pid:        pid,
@@ -70,12 +70,12 @@ func (s *Session) Run(ctx context.Context) {
 	}
 }
 
-// dial the server, retrying on temporary failure
+// dial the server, retrying on temporary failure.
 func (s *Session) dial(ctx context.Context) (*websocket.Conn, error) {
 	for {
 		u := s.serverURL.JoinPath("session", s.sid.String(), s.pid.String())
 		conn, _, err := websocket.Dial(ctx, u.String(), &websocket.DialOptions{HTTPClient: s.client})
-		if internal.HttpIsTemporary(err) {
+		if internal.HTTPIsTemporary(err) {
 			time.Sleep(reconnectInterval)
 			continue
 		}

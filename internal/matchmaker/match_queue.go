@@ -159,7 +159,7 @@ func (q *MatchQueue) Unqueue(pid internal.PlayerID) {
 }
 
 // Untrack removes a session and associated players, allowing them to requeue
-// for another match
+// for another match.
 func (q *MatchQueue) Untrack(sid internal.SessionID) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
