@@ -1,6 +1,7 @@
 package matchmaker
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"net/url"
@@ -148,10 +149,17 @@ func ensureSchema(conn sqlx.Execer) error {
 
 // StartSessionMonitor runs a background goroutine that checks for uncancelled
 // expired sessions to cancel.
-func (db *DB) StartSessionMonitor(interval time.Duration, onCancel func(internal.SessionID)) {
+func (db *DB) StartSessionMonitor(ctx context.Context, interval time.Duration, onCancel func(internal.SessionID)) {
 	go func() {
-		for range time.Tick(interval) {
-			db.cancelExpiredSessions(onCancel)
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				db.cancelExpiredSessions(onCancel)
+			}
 		}
 	}()
 }

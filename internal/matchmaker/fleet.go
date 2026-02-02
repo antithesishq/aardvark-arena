@@ -3,6 +3,7 @@ package matchmaker
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -111,6 +112,7 @@ func (f *Fleet) CreateSession(kind game.Kind) (*SessionInfo, error) {
 			return nil, err
 		}
 		if resp.StatusCode == http.StatusOK {
+			log.Printf("session %s created on gameserver %s", sid, server.url.String())
 			return &SessionInfo{
 				Server:    server.url,
 				SessionID: sid,

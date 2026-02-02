@@ -25,7 +25,7 @@ func must[T any](v T, err error) T {
 // startGameServer creates a gameserver httptest.Server.
 func startGameServer(t *testing.T, mmURL *url.URL) *httptest.Server {
 	t.Helper()
-	gs := gameserver.New(gameserver.Config{
+	gs := gameserver.New(context.Background(), gameserver.Config{
 		TurnTimeout:   30 * time.Second,
 		MaxSessions:   100,
 		MatchmakerURL: mmURL,
@@ -52,7 +52,7 @@ func startMatchmaker(t *testing.T) *url.URL {
 		mmHTTP.Close()
 	})
 
-	mm, err := matchmaker.New(matchmaker.Config{
+	mm, err := matchmaker.New(context.Background(), matchmaker.Config{
 		SessionTimeout:         5 * time.Minute,
 		MatchInterval:          10 * time.Millisecond,
 		SessionMonitorInterval: time.Minute,

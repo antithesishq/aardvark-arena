@@ -2,6 +2,7 @@ package gameserver
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"math"
 	"net/http"
@@ -40,7 +41,7 @@ func CheckHealth(t *testing.T, srv *Server, active int) HealthResponse {
 func TestServerSanity(t *testing.T) {
 
 	t.Run("healthcheck", func(t *testing.T) {
-		srv := New(Config{
+		srv := New(context.Background(), Config{
 			TurnTimeout: 30 * time.Second,
 			MaxSessions: 10,
 		})
@@ -54,7 +55,7 @@ func TestServerSanity(t *testing.T) {
 	})
 
 	t.Run("create session", func(t *testing.T) {
-		srv := New(Config{
+		srv := New(context.Background(), Config{
 			TurnTimeout: 30 * time.Second,
 			MaxSessions: 10,
 		})
@@ -82,7 +83,7 @@ func TestServerSanity(t *testing.T) {
 
 	t.Run("sessions full", func(t *testing.T) {
 		sessionTimeout := 5 * time.Minute
-		srv := New(Config{
+		srv := New(context.Background(), Config{
 			TurnTimeout: 30 * time.Second,
 			MaxSessions: 1,
 		})

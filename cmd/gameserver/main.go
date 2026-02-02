@@ -2,11 +2,13 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"time"
 
 	"github.com/antithesishq/aardvark-arena/internal"
@@ -27,15 +29,31 @@ func main() {
 
 	log.Println("starting gameserver...")
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
 	cfg := gameserver.Config{
 		TurnTimeout:   *turnTimeout,
 		MaxSessions:   *maxSessions,
 		MatchmakerURL: &matchmakerURL,
 		Token:         token,
 	}
-	srv := gameserver.New(cfg)
+	srv := gameserver.New(ctx, cfg)
+
+	httpServer := &http.Server{Addr: *addr, Handler: srv}
+	go func() {
+		<-ctx.Done()
+		log.Println("shutting down gameserver...")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := httpServer.Shutdown(shutdownCtx); err != nil {
+			log.Printf("shutdown error: %v", err)
+		}
+	}()
+
 	log.Printf("listening on %s", *addr)
-	if err := http.ListenAndServe(*addr, srv); err != nil {
+	if err := httpServer.ListenAndServe(); err != http.ErrServerClosed {
 		log.Panicf("server error: %v", err)
 	}
+	log.Println("gameserver stopped")
 }

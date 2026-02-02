@@ -2,11 +2,13 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"time"
 
 	"github.com/antithesishq/aardvark-arena/internal"
@@ -39,6 +41,9 @@ func main() {
 		gameServers = append(gameServers, defaultURL)
 	}
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
 	cfg := matchmaker.Config{
 		SessionTimeout:         *sessionTimeout,
 		MatchInterval:          *matchInterval,
@@ -47,12 +52,25 @@ func main() {
 		Token:                  token,
 		DatabasePath:           *databasePath,
 	}
-	srv, err := matchmaker.New(cfg)
+	srv, err := matchmaker.New(ctx, cfg)
 	if err != nil {
 		log.Panicf("failed to create server: %v", err)
 	}
+
+	httpServer := &http.Server{Addr: *addr, Handler: srv}
+	go func() {
+		<-ctx.Done()
+		log.Println("shutting down matchmaker...")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := httpServer.Shutdown(shutdownCtx); err != nil {
+			log.Printf("shutdown error: %v", err)
+		}
+	}()
+
 	log.Printf("listening on %s", *addr)
-	if err := http.ListenAndServe(*addr, srv); err != nil {
+	if err := httpServer.ListenAndServe(); err != http.ErrServerClosed {
 		log.Panicf("server error: %v", err)
 	}
+	log.Println("matchmaker stopped")
 }

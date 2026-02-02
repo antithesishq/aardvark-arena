@@ -2,6 +2,7 @@
 package gameserver
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"math"
@@ -31,8 +32,9 @@ type Server struct {
 	reporter *Reporter
 }
 
-// New creates a new Server.
-func New(cfg Config) *Server {
+// New creates a new Server. Background goroutines are tied to the given context
+// and will stop when it is cancelled.
+func New(ctx context.Context, cfg Config) *Server {
 	resultCh := make(chan resultMsg, cfg.MaxSessions)
 	s := &Server{
 		cfg:      cfg,
@@ -41,7 +43,7 @@ func New(cfg Config) *Server {
 		reporter: NewReporter(resultCh, cfg.Token, cfg.MatchmakerURL),
 	}
 	s.routes()
-	s.reporter.StartReporter()
+	s.reporter.StartReporter(ctx)
 	return s
 }
 

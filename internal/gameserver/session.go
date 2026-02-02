@@ -81,6 +81,7 @@ func (s *SessionManager) CreateSession(sid internal.SessionID, game game.Kind, d
 		}
 		go handle.RunToCompletion(game, deadline, s.cfg.TurnTimeout)
 		s.sessions[sid] = handle
+		log.Printf("session %s created", sid)
 	}
 
 	handle := s.sessions[sid]

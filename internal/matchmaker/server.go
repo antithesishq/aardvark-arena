@@ -2,6 +2,7 @@
 package matchmaker
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"time"
@@ -39,8 +40,9 @@ type Server struct {
 	db    *DB
 }
 
-// New creates a new Server.
-func New(cfg Config) (*Server, error) {
+// New creates a new Server. Background goroutines are tied to the given context
+// and will stop when it is cancelled.
+func New(ctx context.Context, cfg Config) (*Server, error) {
 	db, err := NewDB(cfg.DatabasePath)
 	if err != nil {
 		return nil, err
@@ -53,8 +55,8 @@ func New(cfg Config) (*Server, error) {
 		db:    db,
 	}
 	s.routes()
-	s.queue.StartMatcher(cfg.MatchInterval)
-	s.db.StartSessionMonitor(cfg.SessionMonitorInterval, s.queue.Untrack)
+	s.queue.StartMatcher(ctx, cfg.MatchInterval)
+	s.db.StartSessionMonitor(ctx, cfg.SessionMonitorInterval, s.queue.Untrack)
 	return s, nil
 }
 

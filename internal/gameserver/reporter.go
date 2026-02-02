@@ -2,6 +2,7 @@ package gameserver
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -29,10 +30,19 @@ func NewReporter(resultCh chan resultMsg, token internal.Token, matchmaker *url.
 }
 
 // StartReporter begins processing results in the background.
-func (r *Reporter) StartReporter() {
+// It stops when the context is cancelled.
+func (r *Reporter) StartReporter(ctx context.Context) {
 	go func() {
-		for result := range r.resultCh {
-			r.submitResult(result)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case result, ok := <-r.resultCh:
+				if !ok {
+					return
+				}
+				r.submitResult(result)
+			}
 		}
 	}()
 }

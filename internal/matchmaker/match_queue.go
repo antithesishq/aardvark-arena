@@ -1,6 +1,7 @@
 package matchmaker
 
 import (
+	"context"
 	"log"
 	"math/rand"
 	"sync"
@@ -39,10 +40,18 @@ func NewMatchQueue(fleet *Fleet, db *DB) *MatchQueue {
 }
 
 // StartMatcher starts the matching process in a separate goroutine.
-func (q *MatchQueue) StartMatcher(interval time.Duration) {
+// It stops when the context is cancelled.
+func (q *MatchQueue) StartMatcher(ctx context.Context, interval time.Duration) {
 	go func() {
-		for range time.Tick(interval) {
-			q.matchPlayers()
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				q.matchPlayers()
+			}
 		}
 	}()
 }
@@ -123,6 +132,7 @@ func (q *MatchQueue) publishMatch(session *SessionInfo, a, b *candidate) {
 			log.Panicf("db error: %v", err)
 		}
 
+		log.Printf("players matched to session %s: %s %s", session.SessionID, a.pid, b.pid)
 		delete(q.queued, a.pid)
 		delete(q.queued, b.pid)
 		q.matched[a.pid] = session
