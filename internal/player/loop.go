@@ -75,12 +75,9 @@ func (l *Loop) waitForMatch(ctx context.Context, lastSID internal.SessionID) (*m
 		}
 
 		info, err := l.client.Queue(ctx, nil)
-		if internal.HTTPIsTemporary(err) {
+		if err != nil {
 			log.Printf("queue error (retrying): %v", err)
 			continue
-		}
-		if err != nil {
-			return nil, err
 		}
 		if info != nil && info.SessionID != lastSID {
 			return info, nil

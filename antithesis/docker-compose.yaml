@@ -1,0 +1,151 @@
+x-auth-token: &auth-token
+  AUTH_TOKEN: d4f5a1b2-0e3c-4a6d-9f8b-7c2e1d3a5b6f
+
+services:
+  matchmaker:
+    image: aardvark-arena-service:latest
+    container_name: matchmaker
+    hostname: matchmaker
+    init: true
+    environment:
+      <<: *auth-token
+    command:
+      - sh
+      - -c
+      - >-
+        matchmaker -addr=:8080 -token=$$AUTH_TOKEN
+        -gameserver=http://gameserver-1:8081
+        -gameserver=http://gameserver-2:8081
+        -gameserver=http://gameserver-3:8081
+        -match-interval=500ms
+        -monitor-interval=2s
+        -session-timeout=1m
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  gameserver-1:
+    image: aardvark-arena-service:latest
+    container_name: gameserver-1
+    hostname: gameserver-1
+    init: true
+    command:
+      - sh
+      - -c
+      - >-
+        gameserver -addr=:8081
+        -token=$$AUTH_TOKEN
+        -matchmaker=http://matchmaker:8080
+        -turn-timeout=10s
+        -max-sessions=50
+    environment:
+      <<: *auth-token
+    depends_on:
+      matchmaker:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8081/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+
+  gameserver-2:
+    image: aardvark-arena-service:latest
+    container_name: gameserver-2
+    hostname: gameserver-2
+    init: true
+    command:
+      - sh
+      - -c
+      - >-
+        gameserver -addr=:8081
+        -token=$$AUTH_TOKEN
+        -matchmaker=http://matchmaker:8080
+        -turn-timeout=10s
+        -max-sessions=50
+    environment:
+      <<: *auth-token
+    depends_on:
+      matchmaker:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8081/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+
+  gameserver-3:
+    image: aardvark-arena-service:latest
+    container_name: gameserver-3
+    hostname: gameserver-3
+    init: true
+    command:
+      - sh
+      - -c
+      - >-
+        gameserver -addr=:8081
+        -token=$$AUTH_TOKEN
+        -matchmaker=http://matchmaker:8080
+        -turn-timeout=10s
+        -max-sessions=50
+    environment:
+      <<: *auth-token
+    depends_on:
+      matchmaker:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8081/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+
+  health-checker:
+    image: aardvark-arena-health-checker:latest
+    container_name: health-checker
+    depends_on:
+      matchmaker:
+        condition: service_healthy
+      gameserver-1:
+        condition: service_healthy
+      gameserver-2:
+        condition: service_healthy
+      gameserver-3:
+        condition: service_healthy
+
+  client-1:
+    image: aardvark-arena-player:latest
+    container_name: client-1
+    hostname: client-1
+    init: true
+    entrypoint: "sleep infinity"
+    environment:
+      MATCHMAKER_URL: http://matchmaker:8080
+    depends_on:
+      matchmaker:
+        condition: service_healthy
+      gameserver-1:
+        condition: service_healthy
+      gameserver-2:
+        condition: service_healthy
+      gameserver-3:
+        condition: service_healthy
+
+  client-2:
+    image: aardvark-arena-player:latest
+    container_name: client-2
+    hostname: client-2
+    init: true
+    entrypoint: "sleep infinity"
+    environment:
+      MATCHMAKER_URL: http://matchmaker:8080
+    depends_on:
+      matchmaker:
+        condition: service_healthy
+      gameserver-1:
+        condition: service_healthy
+      gameserver-2:
+        condition: service_healthy
+      gameserver-3:
+        condition: service_healthy

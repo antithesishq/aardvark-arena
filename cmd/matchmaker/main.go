@@ -30,7 +30,7 @@ func main() {
 	sessionMonitorInterval := flag.Duration("monitor-interval", DefaultSessionMonitorInterval, "interval between checking for expired sessions")
 	flag.Var(&gameServers, "gameserver", "gameserver URL (can be repeated)")
 	var token internal.Token
-	flag.Var(&token, "key", "token for authenticating gameserver requests")
+	flag.Var(&token, "token", "token for authenticating gameserver requests")
 	databasePath := flag.String("db-path", ":memory:", "path to the SQLite database")
 	flag.Parse()
 

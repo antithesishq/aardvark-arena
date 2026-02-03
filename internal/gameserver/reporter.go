@@ -69,11 +69,9 @@ func (r *Reporter) submitResult(result resultMsg) {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", r.token.String()))
 	}
 	_, err = r.client.Do(req)
-	if urlerr, ok := err.(*url.Error); ok {
-		if urlerr.Temporary() {
-			r.resultCh <- result
-			return
-		}
+	if internal.HTTPIsTemporary(err) {
+		r.resultCh <- result
+		return
 	}
 	if err != nil {
 		log.Printf("failed to submit result for session %s: %v", result.sid, err)

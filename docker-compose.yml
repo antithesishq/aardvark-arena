@@ -15,7 +15,7 @@ services:
       - sh
       - -c
       - >-
-        matchmaker -addr=:8080 -key=$$AUTH_TOKEN
+        matchmaker -addr=:8080 -token=$$AUTH_TOKEN
         -gameserver=http://gameserver-1:8081
         -gameserver=http://gameserver-2:8081
         -gameserver=http://gameserver-3:8081

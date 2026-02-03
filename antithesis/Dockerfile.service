@@ -1,0 +1,25 @@
+FROM golang:1.25 AS builder
+
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+
+# Install the Antithesis Go instrumentor
+RUN go get -tool github.com/antithesishq/antithesis-sdk-go/tools/antithesis-go-instrumentor@latest
+
+# Instrument the source
+RUN mkdir -p /instrumented
+RUN go tool antithesis-go-instrumentor /src /instrumented
+
+# Build instrumented binaries (matchmaker and gameserver need CGO for SQLite)
+WORKDIR /instrumented/customer
+RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o /matchmaker ./cmd/matchmaker
+RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o /gameserver ./cmd/gameserver
+
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /matchmaker /gameserver /usr/local/bin/
+COPY --from=builder /instrumented/symbols /symbols
