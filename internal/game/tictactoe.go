@@ -3,6 +3,8 @@ package game
 import (
 	"fmt"
 	"math/rand"
+
+	"github.com/antithesishq/aardvark-arena/internal"
 )
 
 // lines contains all winning lines: 3 rows, 3 columns, 2 diagonals.
@@ -125,11 +127,13 @@ func (s *TicTacToeSession) MakeMove(state State[TicTacToeBoard], player Player, 
 
 // TicTacToeAi implements GameAi for TicTacToe.
 // Simple strategy: play into a line with only own tokens, or block a line with 2 opponent tokens, otherwise random.
-type TicTacToeAi struct{}
+type TicTacToeAi struct {
+	rng *rand.Rand
+}
 
 // NewTicTacToeAi creates a new TicTacToe AI for the given player.
 func NewTicTacToeAi() *TicTacToeAi {
-	return &TicTacToeAi{}
+	return &TicTacToeAi{rng: internal.NewRand()}
 }
 
 // GetMove returns the AI's chosen move for the current board state.
@@ -159,5 +163,5 @@ func (ai *TicTacToeAi) GetMove(player Player, board TicTacToeBoard) (Position, e
 	if len(empties) == 0 {
 		return Position{}, fmt.Errorf("no valid moves available")
 	}
-	return empties[rand.Intn(len(empties))], nil
+	return empties[ai.rng.Intn(len(empties))], nil
 }

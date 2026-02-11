@@ -9,6 +9,8 @@ import (
 
 	"github.com/antithesishq/aardvark-arena/internal"
 	"github.com/antithesishq/aardvark-arena/internal/game"
+	"github.com/antithesishq/antithesis-sdk-go/assert"
+	"github.com/google/uuid"
 )
 
 // Config holds server configuration.
@@ -91,6 +93,10 @@ func (s *Server) handleQueue(w http.ResponseWriter, r *http.Request) {
 		internal.WriteError(w, http.StatusBadRequest, err)
 		return
 	}
+	assert.Sometimes(body.Game != nil,
+		"players sometimes request a specific game kind",
+		nil,
+	)
 	player, err := s.db.GetOrCreatePlayer(pid)
 	if err != nil {
 		internal.WriteError(w, http.StatusInternalServerError, err)
@@ -102,10 +108,18 @@ func (s *Server) handleQueue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if info == nil {
+		assert.Sometimes(true,
+			"queue requests sometimes wait before a session is assigned",
+			nil,
+		)
 		w.WriteHeader(http.StatusAccepted)
 		_, _ = w.Write([]byte("queued"))
 		return
 	}
+	assert.Sometimes(true,
+		"queue requests sometimes return an immediate session assignment",
+		map[string]any{"game": string(info.Game)},
+	)
 	_ = internal.RespondJSON(w, info)
 }
 
@@ -136,6 +150,11 @@ func (s *Server) handleResult(w http.ResponseWriter, r *http.Request) {
 		internal.WriteError(w, http.StatusBadRequest, err)
 		return
 	}
+	assert.Always(
+		!(body.Cancelled && body.Winner != uuid.Nil),
+		"cancelled session results never declare a winner",
+		map[string]any{"sid": sid.String()},
+	)
 	err = s.db.ReportSessionResult(sid, body.Cancelled, body.Winner)
 	if err != nil {
 		internal.WriteError(w, http.StatusInternalServerError, err)

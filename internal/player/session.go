@@ -12,8 +12,10 @@ import (
 
 	"github.com/antithesishq/aardvark-arena/internal"
 	"github.com/antithesishq/aardvark-arena/internal/gameserver"
+	"github.com/antithesishq/antithesis-sdk-go/assert"
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
+	"github.com/google/uuid"
 )
 
 const reconnectInterval = time.Second
@@ -25,6 +27,7 @@ type Session struct {
 	serverURL url.URL
 	sid       internal.SessionID
 	pid       internal.PlayerID
+	behavior  Behavior
 
 	// communication channels between protocol and session
 	protocolRx chan gameserver.PlayerMsg
@@ -36,12 +39,14 @@ func NewSession(
 	serverURL url.URL,
 	sid internal.SessionID,
 	pid internal.PlayerID,
+	behavior Behavior,
 ) *Session {
 	return &Session{
 		client:     internal.NewHTTPClient(),
 		serverURL:  serverURL,
 		sid:        sid,
 		pid:        pid,
+		behavior:   behavior.Normalize(),
 		protocolRx: make(chan gameserver.PlayerMsg, 1),
 		protocolTx: make(chan json.RawMessage, 1),
 	}
@@ -50,6 +55,9 @@ func NewSession(
 // Run manages the websocket connection lifecycle.
 func (s *Session) Run(ctx context.Context) {
 	defer close(s.protocolRx)
+	if s.behavior.Evil && s.behavior.ExtraConnectRate > 0 {
+		go s.runExtraConnectChaos(ctx)
+	}
 
 	for {
 		conn, err := s.dial(ctx)
@@ -66,6 +74,37 @@ func (s *Session) Run(ctx context.Context) {
 		}
 		if err != nil {
 			log.Printf("player %s: connection error: %v", s.pid, err)
+		}
+	}
+}
+
+func (s *Session) runExtraConnectChaos(ctx context.Context) {
+	rng := internal.NewRand()
+	ticker := time.NewTicker(250 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if !s.behavior.doExtraConnect(rng) {
+				continue
+			}
+			assert.Reachable(
+				"evil players sometimes attempt random-id background joins",
+				map[string]any{"sid": s.sid.String()},
+			)
+			pid := uuid.New()
+			dialCtx, cancel := context.WithTimeout(ctx, 1500*time.Millisecond)
+			u := s.serverURL.JoinPath("session", s.sid.String(), pid.String())
+			conn, _, err := websocket.Dial(dialCtx, u.String(), &websocket.DialOptions{HTTPClient: s.client})
+			cancel()
+			if err != nil {
+				continue
+			}
+			// Keep the connection very brief; we only need to exercise join logic.
+			_ = conn.Close(websocket.StatusNormalClosure, "chaos join probe")
 		}
 	}
 }

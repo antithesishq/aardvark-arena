@@ -8,6 +8,7 @@ import (
 
 	"github.com/antithesishq/aardvark-arena/internal"
 	"github.com/antithesishq/aardvark-arena/internal/game"
+	"github.com/antithesishq/antithesis-sdk-go/assert"
 	"github.com/google/uuid"
 )
 
@@ -115,6 +116,11 @@ outer:
 			p.report(game.Cancelled)
 			break outer
 		case <-p.turnTimer.C:
+			if len(p.players) == 0 {
+				// No one is connected yet; keep waiting for a connection or deadline.
+				p.turnTimer.Reset(p.turnTimeout * 2)
+				continue
+			}
 			p.report(p.state.CurrentPlayer.Opponent().Wins())
 			break outer
 		case msg, ok := <-p.inbox:
@@ -143,6 +149,10 @@ outer:
 
 func (p *Protocol[M, S]) handleConn(pid internal.PlayerID, conn chan PlayerMsg) {
 	if existing, ok := p.players[pid]; ok {
+		assert.Reachable(
+			"players sometimes reconnect to an in-progress session",
+			map[string]any{"sid": p.sid.String(), "pid": pid.String()},
+		)
 		// if existing, replace
 		close(existing.conn)
 		p.players[pid] = playerConn{player: existing.player, conn: conn}
@@ -159,6 +169,10 @@ func (p *Protocol[M, S]) handleConn(pid internal.PlayerID, conn chan PlayerMsg) 
 			conn:   conn,
 		}
 	} else {
+		assert.Reachable(
+			"extra player connections are sometimes rejected",
+			map[string]any{"sid": p.sid.String(), "pid": pid.String()},
+		)
 		conn <- PlayerMsg{Error: "too many players connected"}
 	}
 
@@ -169,11 +183,19 @@ func (p *Protocol[M, S]) handleConn(pid internal.PlayerID, conn chan PlayerMsg) 
 func (p *Protocol[M, S]) handleMove(pid internal.PlayerID, rawMove json.RawMessage) {
 	playerConn, ok := p.players[pid]
 	if !ok {
+		assert.Unreachable(
+			"moves should only arrive from connected players",
+			map[string]any{"sid": p.sid.String(), "pid": pid.String()},
+		)
 		log.Fatal("BUG: move from disconnected player")
 	}
 
 	var move M
 	if err := json.Unmarshal(rawMove, &move); err != nil {
+		assert.Reachable(
+			"sessions sometimes receive invalid move payloads",
+			map[string]any{"sid": p.sid.String(), "pid": pid.String()},
+		)
 		p.SendErr(pid, fmt.Errorf("invalid move: %w", err))
 		return
 	}
@@ -181,6 +203,10 @@ func (p *Protocol[M, S]) handleMove(pid internal.PlayerID, rawMove json.RawMessa
 	var err error
 	p.state, err = p.session.MakeMove(p.state, playerConn.player, move)
 	if err != nil {
+		assert.Reachable(
+			"sessions sometimes receive invalid semantic moves",
+			map[string]any{"sid": p.sid.String(), "pid": pid.String()},
+		)
 		p.SendErr(pid, fmt.Errorf("invalid move: %w", err))
 		return
 	}

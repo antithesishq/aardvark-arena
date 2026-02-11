@@ -10,6 +10,7 @@ import (
 
 	"github.com/antithesishq/aardvark-arena/internal"
 	"github.com/antithesishq/aardvark-arena/internal/game"
+	"github.com/antithesishq/antithesis-sdk-go/assert"
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 )
@@ -59,6 +60,10 @@ func (s *SessionManager) CreateSession(sid internal.SessionID, game game.Kind, d
 
 	if _, ok := s.sessions[sid]; !ok {
 		if len(s.sessions) >= s.cfg.MaxSessions {
+			assert.Reachable(
+				"session creation sometimes fails because the server is full",
+				map[string]any{"active_sessions": len(s.sessions), "max": s.cfg.MaxSessions},
+			)
 			// find min deadline
 			var minDeadline = maxTime
 			for _, session := range s.sessions {
@@ -164,6 +169,10 @@ func (h *sessionHandle) RunToCompletion(g game.Kind, deadline time.Time, turnTim
 		)
 		protocol.RunToCompletion()
 	default:
+		assert.Unreachable(
+			"session manager should only run supported game kinds",
+			map[string]any{"game": string(g)},
+		)
 		log.Fatal("unsupported game kind")
 	}
 }

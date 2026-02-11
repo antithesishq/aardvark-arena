@@ -13,6 +13,7 @@ import (
 	"github.com/antithesishq/aardvark-arena/internal"
 	"github.com/antithesishq/aardvark-arena/internal/game"
 	"github.com/antithesishq/aardvark-arena/internal/gameserver"
+	"github.com/antithesishq/antithesis-sdk-go/assert"
 	"github.com/google/uuid"
 )
 
@@ -29,6 +30,7 @@ type Fleet struct {
 	client         *http.Client
 	token          internal.Token
 	sessionTimeout time.Duration
+	rng            *rand.Rand
 }
 
 // Keep track of a single game server.
@@ -51,6 +53,7 @@ func NewFleet(urls []*url.URL, token internal.Token, sessionTimeout time.Duratio
 		client:         internal.NewHTTPClient(),
 		token:          token,
 		sessionTimeout: sessionTimeout,
+		rng:            internal.NewRand(),
 	}
 }
 
@@ -74,11 +77,15 @@ func (f *Fleet) CreateSession(kind game.Kind) (*SessionInfo, error) {
 	}
 
 	if len(candidates) == 0 {
+		assert.Reachable(
+			"fleet sometimes has no currently available gameserver candidates",
+			map[string]any{"total_servers": len(f.servers)},
+		)
 		return nil, ErrNoServersAvailable
 	}
 
 	// randomly shuffle candidates
-	rand.Shuffle(len(candidates), func(i, j int) {
+	f.rng.Shuffle(len(candidates), func(i, j int) {
 		candidates[i], candidates[j] = candidates[j], candidates[i]
 	})
 
@@ -104,6 +111,10 @@ func (f *Fleet) CreateSession(kind game.Kind) (*SessionInfo, error) {
 		}
 		resp, err := f.client.Do(req)
 		if internal.HTTPIsTemporary(err) {
+			assert.Reachable(
+				"fleet sometimes encounters temporary transport failures",
+				map[string]any{"server": server.url.String()},
+			)
 			retryAt := time.Now().Add(FailureTimeout)
 			server.retryAt = &retryAt
 			continue
@@ -112,6 +123,12 @@ func (f *Fleet) CreateSession(kind game.Kind) (*SessionInfo, error) {
 			return nil, err
 		}
 		if resp.StatusCode == http.StatusOK {
+			_ = resp.Body.Close()
+			assert.Sometimes(
+				true,
+				"session creation sometimes succeeds on a gameserver",
+				map[string]any{"server": server.url.String()},
+			)
 			log.Printf("session %s created on gameserver %s", sid, server.url.String())
 			return &SessionInfo{
 				Server:    server.url,
@@ -120,6 +137,10 @@ func (f *Fleet) CreateSession(kind game.Kind) (*SessionInfo, error) {
 				Timeout:   f.sessionTimeout,
 			}, nil
 		} else if resp.StatusCode == http.StatusServiceUnavailable {
+			assert.Reachable(
+				"gameservers sometimes reject session creation due to capacity",
+				map[string]any{"server": server.url.String()},
+			)
 			retryAfterSecs, err := strconv.Atoi(resp.Header.Get("Retry-After"))
 			if err == nil {
 				retryAt := time.Now().Add(time.Second * time.Duration(retryAfterSecs))
@@ -128,9 +149,18 @@ func (f *Fleet) CreateSession(kind game.Kind) (*SessionInfo, error) {
 				retryAt := time.Now().Add(FailureTimeout)
 				server.retryAt = &retryAt
 			}
+			_ = resp.Body.Close()
 			continue
 		}
+		_ = resp.Body.Close()
 		// all other statuses are unexpected errors
+		assert.Unreachable(
+			"gameserver should only return 200 or 503 for session creation",
+			map[string]any{
+				"server": server.url.String(),
+				"status": resp.StatusCode,
+			},
+		)
 		return nil, fmt.Errorf("unexpected response from gameserver: %s", resp.Status)
 	}
 

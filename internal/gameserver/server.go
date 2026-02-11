@@ -13,6 +13,7 @@ import (
 
 	"github.com/antithesishq/aardvark-arena/internal"
 	"github.com/antithesishq/aardvark-arena/internal/game"
+	"github.com/antithesishq/antithesis-sdk-go/assert"
 	"github.com/coder/websocket"
 )
 
@@ -65,11 +66,17 @@ type HealthResponse struct {
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
+	active := s.sessions.ActiveSessions()
 	health := HealthResponse{
-		ActiveSessions: s.sessions.ActiveSessions(),
+		ActiveSessions: active,
 		MaxSessions:    s.cfg.MaxSessions,
-		Full:           s.sessions.ActiveSessions() >= s.cfg.MaxSessions,
+		Full:           active >= s.cfg.MaxSessions,
 	}
+	assert.Always(
+		health.ActiveSessions <= health.MaxSessions,
+		"gameserver active sessions never exceed max sessions",
+		map[string]any{"active": health.ActiveSessions, "max": health.MaxSessions},
+	)
 	if err := internal.RespondJSON(w, health); err != nil {
 		internal.WriteError(w, http.StatusInternalServerError, err)
 	}
@@ -95,6 +102,10 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 	deadline := time.Now().Add(body.Timeout)
 	err = s.sessions.CreateSession(sid, body.Game, deadline)
 	if e, ok := err.(*ErrMaxSessions); ok {
+		assert.Reachable(
+			"gameserver sometimes reaches max session capacity",
+			map[string]any{"sid": sid.String()},
+		)
 		retrySeconds := strconv.Itoa(int(math.Ceil(time.Until(e.RetryAt).Seconds())))
 		w.Header().Add("Retry-After", retrySeconds)
 		internal.WriteError(w, http.StatusServiceUnavailable, err)
@@ -103,6 +114,11 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 		internal.WriteError(w, http.StatusInternalServerError, err)
 		return
 	}
+	assert.Sometimes(
+		true,
+		"gameserver sometimes accepts session creation requests",
+		map[string]any{"sid": sid.String(), "game": string(body.Game)},
+	)
 
 	w.WriteHeader(http.StatusOK)
 }

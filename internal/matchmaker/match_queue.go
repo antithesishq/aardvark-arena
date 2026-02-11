@@ -9,6 +9,7 @@ import (
 
 	"github.com/antithesishq/aardvark-arena/internal"
 	"github.com/antithesishq/aardvark-arena/internal/game"
+	"github.com/antithesishq/antithesis-sdk-go/assert"
 )
 
 type candidate struct {
@@ -27,6 +28,7 @@ type MatchQueue struct {
 	// map from player id to ELO
 	queued  map[internal.PlayerID]*candidate
 	matched map[internal.PlayerID]*SessionInfo
+	rng     *rand.Rand
 }
 
 // NewMatchQueue creates a MatchQueue backed by the given Fleet.
@@ -36,6 +38,7 @@ func NewMatchQueue(fleet *Fleet, db *DB) *MatchQueue {
 		db:      db,
 		queued:  make(map[internal.PlayerID]*candidate),
 		matched: make(map[internal.PlayerID]*SessionInfo),
+		rng:     internal.NewRand(),
 	}
 }
 
@@ -85,6 +88,11 @@ func (q *MatchQueue) collectMatches() []match {
 	if len(q.queued) < 2 {
 		return nil
 	}
+	assert.Sometimes(
+		true,
+		"two or more players are sometimes queued at once",
+		map[string]any{"queued_players": len(q.queued)},
+	)
 
 	// match players
 	var matches []match
@@ -100,8 +108,20 @@ func (q *MatchQueue) collectMatches() []match {
 					chosenGame = b.game
 				}
 				if chosenGame == nil {
-					chosenGame = &game.AllGames[rand.Intn(len(game.AllGames))]
+					chosenGame = &game.AllGames[q.rng.Intn(len(game.AllGames))]
+					assert.Reachable(
+						"matchmaker sometimes selects a random game for wildcard players",
+						nil,
+					)
 				}
+				assert.Reachable(
+					"matchmaker found a pair of compatible players",
+					map[string]any{
+						"p1":   a.pid.String(),
+						"p2":   b.pid.String(),
+						"game": string(*chosenGame),
+					},
+				)
 				matches = append(matches, match{a: a, b: b, game: *chosenGame})
 				break
 			}
@@ -137,7 +157,17 @@ func (q *MatchQueue) publishMatch(session *SessionInfo, a, b *candidate) {
 		delete(q.queued, b.pid)
 		q.matched[a.pid] = session
 		q.matched[b.pid] = session
+		assert.Sometimes(
+			true,
+			"queued players are sometimes promoted to matched sessions",
+			map[string]any{"sid": session.SessionID.String()},
+		)
+		return
 	}
+	assert.Reachable(
+		"match publishing sometimes races with player unqueueing",
+		nil,
+	)
 }
 
 // Queue ensures the player is in the match queue. Returns a non-nil SessionInfo
@@ -148,6 +178,10 @@ func (q *MatchQueue) Queue(player *PlayerModel, game *game.Kind) (*SessionInfo, 
 
 	// Check if the player is already matched
 	if session, ok := q.matched[player.PlayerID]; ok {
+		assert.Reachable(
+			"queue polling sometimes returns an existing match",
+			map[string]any{"sid": session.SessionID.String()},
+		)
 		return session, nil
 	}
 

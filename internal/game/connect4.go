@@ -3,6 +3,8 @@ package game
 import (
 	"fmt"
 	"math/rand"
+
+	"github.com/antithesishq/aardvark-arena/internal"
 )
 
 var connect4Bounds = Bounds{Width: 7, Height: 6}
@@ -116,11 +118,13 @@ func (s *Connect4Session) MakeMove(state State[Connect4Board], player Player, co
 }
 
 // Connect4Ai implements Ai for Connect4.
-type Connect4Ai struct{}
+type Connect4Ai struct {
+	rng *rand.Rand
+}
 
 // NewConnect4Ai creates a new Connect4 AI for the given player.
 func NewConnect4Ai() *Connect4Ai {
-	return &Connect4Ai{}
+	return &Connect4Ai{rng: internal.NewRand()}
 }
 
 // GetMove returns the AI's chosen column.
@@ -157,5 +161,5 @@ func (ai *Connect4Ai) GetMove(player Player, board Connect4Board) (int, error) {
 	}
 
 	// Fallback to random
-	return validCols[rand.Intn(len(validCols))], nil
+	return validCols[ai.rng.Intn(len(validCols))], nil
 }

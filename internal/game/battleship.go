@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math/rand"
 	"slices"
+
+	"github.com/antithesishq/aardvark-arena/internal"
 )
 
 // Battleship board dimensions.
@@ -219,11 +221,12 @@ func (s *BattleshipSession) handleAttack(state State[BattleshipSharedState], pla
 // BattleshipAi implements Ai for Battleship.
 type BattleshipAi struct {
 	setup bool
+	rng   *rand.Rand
 }
 
 // NewBattleshipAi creates a new Battleship AI for the given player.
 func NewBattleshipAi() *BattleshipAi {
-	return &BattleshipAi{}
+	return &BattleshipAi{rng: internal.NewRand()}
 }
 
 // GetMove returns the AI's chosen move for the current state.
@@ -242,7 +245,7 @@ func (ai *BattleshipAi) getSetupMove() (BattleshipMove, error) {
 	for _, ship := range allShipTypes {
 		placed := false
 		for attempts := 0; attempts < 1000 && !placed; attempts++ {
-			orientation := Orientation(rand.Intn(2))
+			orientation := Orientation(ai.rng.Intn(2))
 			var maxX, maxY int
 			if orientation == Horizontal {
 				maxX = battleshipBounds.Width - shipSizes[ship]
@@ -256,7 +259,7 @@ func (ai *BattleshipAi) getSetupMove() (BattleshipMove, error) {
 				continue
 			}
 
-			pos := Position{X: rand.Intn(maxX + 1), Y: rand.Intn(maxY + 1)}
+			pos := Position{X: ai.rng.Intn(maxX + 1), Y: ai.rng.Intn(maxY + 1)}
 			placement := ShipPlacement{Ship: ship, Position: pos, Orientation: orientation}
 
 			// Check no overlap with already placed ships
@@ -310,7 +313,7 @@ func (ai *BattleshipAi) getAttackMove(player Player, state BattleshipSharedState
 	}
 
 	if len(adjacentTargets) > 0 {
-		target := adjacentTargets[rand.Intn(len(adjacentTargets))]
+		target := adjacentTargets[ai.rng.Intn(len(adjacentTargets))]
 		return BattleshipMove{Kind: AttackMoveKind, Target: target}, nil
 	}
 
@@ -329,6 +332,6 @@ func (ai *BattleshipAi) getAttackMove(player Player, state BattleshipSharedState
 		return BattleshipMove{}, fmt.Errorf("no valid targets")
 	}
 
-	target := targets[rand.Intn(len(targets))]
+	target := targets[ai.rng.Intn(len(targets))]
 	return BattleshipMove{Kind: AttackMoveKind, Target: target}, nil
 }

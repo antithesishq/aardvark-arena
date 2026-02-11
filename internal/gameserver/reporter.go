@@ -9,6 +9,8 @@ import (
 	"net/url"
 
 	"github.com/antithesishq/aardvark-arena/internal"
+	"github.com/antithesishq/antithesis-sdk-go/assert"
+	"github.com/google/uuid"
 )
 
 // Reporter sends results back to the matchmaker.
@@ -48,6 +50,11 @@ func (r *Reporter) StartReporter(ctx context.Context) {
 }
 
 func (r *Reporter) submitResult(result resultMsg) {
+	assert.Always(
+		!(result.cancelled && result.winner != uuid.Nil),
+		"gameserver reports never include a winner for cancelled sessions",
+		map[string]any{"sid": result.sid.String()},
+	)
 	reqURL := r.matchmakerURL.JoinPath("results", result.sid.String())
 	type resultReq struct {
 		Cancelled bool
@@ -70,10 +77,18 @@ func (r *Reporter) submitResult(result resultMsg) {
 	}
 	_, err = r.client.Do(req)
 	if internal.HTTPIsTemporary(err) {
+		assert.Reachable(
+			"result reporting sometimes retries after temporary transport errors",
+			map[string]any{"sid": result.sid.String()},
+		)
 		r.resultCh <- result
 		return
 	}
 	if err != nil {
+		assert.Reachable(
+			"result reporting sometimes fails due to non-temporary errors",
+			map[string]any{"sid": result.sid.String()},
+		)
 		log.Printf("failed to submit result for session %s: %v", result.sid, err)
 	}
 }

@@ -27,6 +27,12 @@ func main() {
 	flag.Func("pid", "player UUID (generated if empty)", internal.UUIDParser(&playerID))
 	var numSessions = flag.Int("num-sessions", 0, "number of sessions to play before exiting (0 to play indefinitely)")
 	var pollInterval = flag.Duration("poll-interval", DefaultPollInterval, "duration between polling the matchmaker queue for a session")
+	var evil = flag.Bool("evil", false, "enable probabilistic malicious behavior")
+	var evilChaosRate = flag.Float64("evil-chaos-rate", 0.30, "probability [0,1] of sending a bad move instead of a valid move")
+	var evilOutOfTurnRate = flag.Float64("evil-out-of-turn-rate", 0.10, "probability [0,1] of sending a nuisance move out of turn")
+	var evilMalformedRate = flag.Float64("evil-malformed-rate", 0.50, "probability [0,1] that a bad move is malformed JSON")
+	var evilExtraConnectRate = flag.Float64("evil-extra-connect-rate", 0.08, "probability [0,1] of random-id background websocket join attempts")
+	var evilQueueAbandonRate = flag.Float64("evil-queue-abandon-rate", 0.05, "probability [0,1] of queueing a random player id and never polling it again")
 	flag.Parse()
 
 	log.Println("starting player...")
@@ -39,10 +45,19 @@ func main() {
 	log.Printf("player id: %s", playerID)
 
 	cfg := player.Config{
-		MatchmakerURL: &matchmakerURL,
-		PlayerID:      playerID,
-		NumSessions:   *numSessions,
-		PollInterval:  *pollInterval,
+		MatchmakerURL:             &matchmakerURL,
+		PlayerID:                  playerID,
+		NumSessions:               *numSessions,
+		PollInterval:              *pollInterval,
+		SpecificGameSelectionRate: player.DefaultSpecificGameSelectionRate,
+		Behavior: player.Behavior{
+			Evil:             *evil,
+			ChaosRate:        *evilChaosRate,
+			OutOfTurnRate:    *evilOutOfTurnRate,
+			MalformedRate:    *evilMalformedRate,
+			ExtraConnectRate: *evilExtraConnectRate,
+			QueueAbandonRate: *evilQueueAbandonRate,
+		},
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)

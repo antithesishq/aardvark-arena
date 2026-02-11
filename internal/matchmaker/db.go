@@ -3,12 +3,14 @@ package matchmaker
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"net/url"
 	"time"
 
 	"github.com/antithesishq/aardvark-arena/internal"
 	"github.com/antithesishq/aardvark-arena/internal/game"
+	"github.com/antithesishq/antithesis-sdk-go/assert"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3" // register sqlite3 driver
@@ -173,6 +175,11 @@ func (db *DB) cancelExpiredSessions(onCancel func(internal.SessionID)) {
 		log.Printf("session monitor: query failed: %v", err)
 		return
 	}
+	assert.Sometimes(
+		len(expired) > 0,
+		"sessions sometimes expire before completion",
+		map[string]any{"expired_count": len(expired)},
+	)
 	for _, sid := range expired {
 		err := db.ReportSessionResult(sid, true, uuid.Nil)
 		if err != nil {
@@ -247,6 +254,11 @@ func (db *DB) ReportSessionResult(
 	cancelled bool,
 	winner internal.PlayerID,
 ) error {
+	assert.Always(
+		!(cancelled && winner != uuid.Nil),
+		"cancelled sessions never report a winner",
+		map[string]any{"sid": sid.String()},
+	)
 	tx, err := db.db.Beginx()
 	if err != nil {
 		return err
@@ -281,8 +293,19 @@ func (db *DB) ReportSessionResult(
 		if err != nil {
 			return err
 		}
+		if len(players) != 2 {
+			assert.Unreachable(
+				"every active session should map to exactly two players",
+				map[string]any{
+					"sid":          sid.String(),
+					"player_count": len(players),
+				},
+			)
+			return fmt.Errorf("expected exactly 2 players for session %s, got %d", sid, len(players))
+		}
 
 		draw := winner == uuid.Nil
+		assert.Sometimes(draw, "some completed sessions end in a draw", map[string]any{"sid": sid.String()})
 		for i, player := range players {
 			if draw || player.PlayerID == winner {
 				opponent := players[(i+1)%2]

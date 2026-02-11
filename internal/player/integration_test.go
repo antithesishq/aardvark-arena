@@ -77,10 +77,11 @@ func TestIntegration(t *testing.T) {
 
 	wg.Go(func() {
 		p1 := New(Config{
-			MatchmakerURL: mmURL,
-			PlayerID:      uuid.New(),
-			NumSessions:   10,
-			PollInterval:  time.Millisecond * 10,
+			MatchmakerURL:             mmURL,
+			PlayerID:                  uuid.New(),
+			NumSessions:               10,
+			PollInterval:              time.Millisecond * 10,
+			SpecificGameSelectionRate: 0,
 		})
 		err := p1.Run(ctx)
 		if err != nil {
@@ -90,10 +91,11 @@ func TestIntegration(t *testing.T) {
 
 	wg.Go(func() {
 		p2 := New(Config{
-			MatchmakerURL: mmURL,
-			PlayerID:      uuid.New(),
-			NumSessions:   10,
-			PollInterval:  time.Millisecond * 10,
+			MatchmakerURL:             mmURL,
+			PlayerID:                  uuid.New(),
+			NumSessions:               10,
+			PollInterval:              time.Millisecond * 10,
+			SpecificGameSelectionRate: 0,
 		})
 		err := p2.Run(ctx)
 		if err != nil {
