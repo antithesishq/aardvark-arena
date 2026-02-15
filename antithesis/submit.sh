@@ -29,6 +29,10 @@ while [[ $# -gt 0 ]]; do
       REGISTRY="$2"
       shift 2
       ;;
+    --help)
+      usage
+      exit 0
+      ;;
     -*)
       echo "Unknown option: $1" >&2
       usage
@@ -55,10 +59,10 @@ else
 fi
 
 # Build images
-docker build --platform linux/amd64 -f antithesis/Dockerfile.service -t "$SERVICE_IMAGE" .
-docker build --platform linux/amd64 -f antithesis/Dockerfile.player -t "$PLAYER_IMAGE" .
-docker build --platform linux/amd64 -f antithesis/Dockerfile.health-checker -t "$HEALTH_CHECKER_IMAGE" .
-docker build --platform linux/amd64 -f antithesis/Dockerfile.config -t "$CONFIG_IMAGE" .
+docker build --platform linux/amd64 -f antithesis/Dockerfile --target service -t "$SERVICE_IMAGE" .
+docker build --platform linux/amd64 -f antithesis/Dockerfile --target player -t "$PLAYER_IMAGE" .
+docker build --platform linux/amd64 -f antithesis/Dockerfile --target health-checker -t "$HEALTH_CHECKER_IMAGE" .
+docker build --platform linux/amd64 -f antithesis/Dockerfile --target config -t "$CONFIG_IMAGE" .
 
 if [[ -z "$REGISTRY" ]]; then
   echo "Build complete (no --registry): skipped push and test run."
