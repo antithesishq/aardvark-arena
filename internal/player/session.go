@@ -55,7 +55,7 @@ func NewSession(
 // Run manages the websocket connection lifecycle.
 func (s *Session) Run(ctx context.Context) {
 	defer close(s.protocolRx)
-	if s.behavior.Evil && s.behavior.ExtraConnectRate > 0 {
+	if s.behavior.Evil {
 		go s.runExtraConnectChaos(ctx)
 	}
 

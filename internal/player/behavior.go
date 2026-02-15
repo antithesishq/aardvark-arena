@@ -29,22 +29,22 @@ type Behavior struct {
 	QueueAbandonRate float64
 }
 
-func (b Behavior) doChaos(rng *rand.Rand) bool {
+func (b *Behavior) doChaos(rng *rand.Rand) bool {
 	return b.Evil && rng.Float64() < b.ChaosRate
 }
 
-func (b Behavior) doOutOfTurn(rng *rand.Rand) bool {
+func (b *Behavior) doOutOfTurn(rng *rand.Rand) bool {
 	return b.Evil && rng.Float64() < b.OutOfTurnRate
 }
 
-func (b Behavior) toMalformed(rng *rand.Rand) bool {
+func (b *Behavior) toMalformed(rng *rand.Rand) bool {
 	return b.Evil && rng.Float64() < b.MalformedRate
 }
 
-func (b Behavior) doExtraConnect(rng *rand.Rand) bool {
+func (b *Behavior) doExtraConnect(rng *rand.Rand) bool {
 	return b.Evil && rng.Float64() < b.ExtraConnectRate
 }
 
-func (b Behavior) doQueueAbandon(rng *rand.Rand) bool {
+func (b *Behavior) doQueueAbandon(rng *rand.Rand) bool {
 	return b.Evil && rng.Float64() < b.QueueAbandonRate
 }
