@@ -46,7 +46,7 @@ func NewSession(
 		serverURL:  serverURL,
 		sid:        sid,
 		pid:        pid,
-		behavior:   behavior.Normalize(),
+		behavior:   behavior,
 		protocolRx: make(chan gameserver.PlayerMsg, 1),
 		protocolTx: make(chan json.RawMessage, 1),
 	}

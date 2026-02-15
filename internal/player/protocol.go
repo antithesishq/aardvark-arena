@@ -38,7 +38,7 @@ func NewProtocol[M any, S any](
 		rx:       rx,
 		tx:       tx,
 		ai:       ai,
-		behavior: behavior.Normalize(),
+		behavior: behavior,
 		rng:      internal.NewRand(),
 	}
 }

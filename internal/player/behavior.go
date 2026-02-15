@@ -1,7 +1,6 @@
 package player
 
 import (
-	"math"
 	"math/rand"
 )
 
@@ -28,36 +27,6 @@ type Behavior struct {
 	// QueueAbandonRate is the probability [0,1] of submitting a queue request
 	// for a random throwaway player id, and never polling it again.
 	QueueAbandonRate float64
-}
-
-// Normalize clamps behavior probabilities into [0,1], and disables all chaos
-// rates if Evil is false.
-func (b Behavior) Normalize() Behavior {
-	clamp := func(v float64) float64 {
-		if math.IsNaN(v) {
-			return 0
-		}
-		if v < 0 {
-			return 0
-		}
-		if v > 1 {
-			return 1
-		}
-		return v
-	}
-	b.ChaosRate = clamp(b.ChaosRate)
-	b.OutOfTurnRate = clamp(b.OutOfTurnRate)
-	b.MalformedRate = clamp(b.MalformedRate)
-	b.ExtraConnectRate = clamp(b.ExtraConnectRate)
-	b.QueueAbandonRate = clamp(b.QueueAbandonRate)
-	if !b.Evil {
-		b.ChaosRate = 0
-		b.OutOfTurnRate = 0
-		b.MalformedRate = 0
-		b.ExtraConnectRate = 0
-		b.QueueAbandonRate = 0
-	}
-	return b
 }
 
 func (b Behavior) doChaos(rng *rand.Rand) bool {

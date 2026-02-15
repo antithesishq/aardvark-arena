@@ -44,7 +44,6 @@ type Loop struct {
 
 // New creates a new Loop.
 func New(cfg Config) *Loop {
-	cfg.Behavior = cfg.Behavior.Normalize()
 	return &Loop{
 		cfg:    cfg,
 		client: NewMatchmakerClient(cfg.MatchmakerURL, cfg.PlayerID),
