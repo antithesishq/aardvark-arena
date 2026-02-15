@@ -3,7 +3,6 @@ package game
 
 import (
 	"fmt"
-	"iter"
 	"slices"
 )
 
@@ -192,7 +191,7 @@ type PlayerMap[V any] struct {
 }
 
 // Get retrieves the value for the specified player.
-func (pm PlayerMap[V]) Get(player Player) V {
+func (pm *PlayerMap[V]) Get(player Player) V {
 	if player == P1 {
 		return pm.P1
 	}
@@ -205,17 +204,5 @@ func (pm *PlayerMap[V]) Set(player Player, value V) {
 		pm.P1 = value
 	} else {
 		pm.P2 = value
-	}
-}
-
-// Iter yields each player and their associated value.
-func (pm *PlayerMap[V]) Iter() iter.Seq2[Player, V] {
-	return func(yield func(Player, V) bool) {
-		if !yield(P1, pm.P1) {
-			return
-		}
-		if !yield(P2, pm.P2) {
-			return
-		}
 	}
 }

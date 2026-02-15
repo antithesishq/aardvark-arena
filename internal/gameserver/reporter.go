@@ -51,7 +51,7 @@ func (r *Reporter) StartReporter(ctx context.Context) {
 
 func (r *Reporter) submitResult(result resultMsg) {
 	assert.Always(
-		!(result.cancelled && result.winner != uuid.Nil),
+		!result.cancelled || result.winner == uuid.Nil,
 		"gameserver reports never include a winner for cancelled sessions",
 		map[string]any{"sid": result.sid.String()},
 	)
@@ -75,7 +75,7 @@ func (r *Reporter) submitResult(result resultMsg) {
 	if !r.token.IsNil() {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", r.token.String()))
 	}
-	_, err = r.client.Do(req)
+	resp, err := r.client.Do(req)
 	if internal.HTTPIsTemporary(err) {
 		assert.Reachable(
 			"result reporting sometimes retries after temporary transport errors",
@@ -90,5 +90,16 @@ func (r *Reporter) submitResult(result resultMsg) {
 			map[string]any{"sid": result.sid.String()},
 		)
 		log.Printf("failed to submit result for session %s: %v", result.sid, err)
+		return
 	}
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Sometimes(
+		resp.StatusCode != http.StatusOK,
+		"result reporting sometimes receives non-ok responses",
+		map[string]any{
+			"sid":    result.sid.String(),
+			"status": resp.StatusCode,
+		},
+	)
 }

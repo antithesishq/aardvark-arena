@@ -81,7 +81,7 @@ func PathUUID(r *http.Request, name string) (uuid.UUID, error) {
 	raw := r.PathValue(name)
 	id, err := uuid.Parse(raw)
 	if err != nil {
-		return uuid.UUID{}, fmt.Errorf("invalid param %q: %e", name, err)
+		return uuid.UUID{}, fmt.Errorf("invalid param %q: %w", name, err)
 	}
 	return id, nil
 }

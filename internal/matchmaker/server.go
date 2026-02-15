@@ -151,7 +151,7 @@ func (s *Server) handleResult(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	assert.Always(
-		!(body.Cancelled && body.Winner != uuid.Nil),
+		!body.Cancelled || body.Winner == uuid.Nil,
 		"cancelled session results never declare a winner",
 		map[string]any{"sid": sid.String()},
 	)

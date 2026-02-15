@@ -73,8 +73,7 @@ func TestMatchQueueSanity(t *testing.T) {
 		}
 		if s1 == nil || s2 == nil {
 			t.Fatal("expected both players to be matched")
-		}
-		if s1.SessionID != s2.SessionID {
+		} else if s1.SessionID != s2.SessionID {
 			t.Error("expected both players in the same session")
 		}
 	})

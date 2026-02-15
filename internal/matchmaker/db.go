@@ -75,6 +75,20 @@ const selectExpiredSessions = `
 	WHERE deadline < ? AND completed_at IS NULL
 `
 
+const updateSessionResult = `
+	UPDATE sessions
+	SET cancelled = ?, winner_id = ?, completed_at = ?
+	WHERE session_id = ?
+`
+
+const selectSessionPlayers = `
+	SELECT p.player_id, p.elo
+	FROM players p
+	INNER JOIN player_session ps ON p.player_id = ps.player_id
+	INNER JOIN sessions s ON ps.session_id = s.session_id
+	WHERE s.session_id = ?
+`
+
 // DB wraps an SQLite database for matchmaker persistence.
 type DB struct {
 	db *sqlx.DB
@@ -197,6 +211,7 @@ func (db *DB) GetOrCreatePlayer(pid internal.PlayerID) (*PlayerModel, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer func() { _ = tx.Rollback() }()
 	var p PlayerModel
 	err = tx.Get(&p, selectPlayer, pid)
 	if err == sql.ErrNoRows {
@@ -225,6 +240,7 @@ func (db *DB) CreateSession(
 	if err != nil {
 		return nil, err
 	}
+	defer func() { _ = tx.Rollback() }()
 	var s SessionModel
 	err = tx.Get(&s, insertSession,
 		sid, server.String(), game,
@@ -255,7 +271,7 @@ func (db *DB) ReportSessionResult(
 	winner internal.PlayerID,
 ) error {
 	assert.Always(
-		!(cancelled && winner != uuid.Nil),
+		!cancelled || winner == uuid.Nil,
 		"cancelled sessions never report a winner",
 		map[string]any{"sid": sid.String()},
 	)
@@ -263,11 +279,8 @@ func (db *DB) ReportSessionResult(
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(`
-	  UPDATE sessions
-		SET cancelled = ?, winner_id = ?, completed_at = ?
-		WHERE session_id = ?
-	`, cancelled, winner, time.Now(), sid)
+	defer func() { _ = tx.Rollback() }()
+	_, err = tx.Exec(updateSessionResult, cancelled, winner, time.Now(), sid)
 	if err != nil {
 		return err
 	}
@@ -283,13 +296,7 @@ func (db *DB) ReportSessionResult(
 			PlayerID internal.PlayerID `db:"player_id"`
 			Elo      int
 		}{}
-		err = tx.Select(&players, `
-			SELECT p.player_id, p.elo
-			FROM players p
-			INNER JOIN player_session ps ON p.player_id = ps.player_id
-			INNER JOIN sessions s ON ps.session_id = s.session_id
-			WHERE s.session_id = ?
-		`, sid)
+		err = tx.Select(&players, selectSessionPlayers, sid)
 		if err != nil {
 			return err
 		}

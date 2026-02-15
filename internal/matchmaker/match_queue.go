@@ -3,7 +3,7 @@ package matchmaker
 import (
 	"context"
 	"log"
-	"math/rand"
+	"sort"
 	"sync"
 	"time"
 
@@ -28,7 +28,6 @@ type MatchQueue struct {
 	// map from player id to ELO
 	queued  map[internal.PlayerID]*candidate
 	matched map[internal.PlayerID]*SessionInfo
-	rng     *rand.Rand
 }
 
 // NewMatchQueue creates a MatchQueue backed by the given Fleet.
@@ -38,7 +37,6 @@ func NewMatchQueue(fleet *Fleet, db *DB) *MatchQueue {
 		db:      db,
 		queued:  make(map[internal.PlayerID]*candidate),
 		matched: make(map[internal.PlayerID]*SessionInfo),
-		rng:     internal.NewRand(),
 	}
 }
 
@@ -88,46 +86,73 @@ func (q *MatchQueue) collectMatches() []match {
 	if len(q.queued) < 2 {
 		return nil
 	}
-	assert.Sometimes(
-		true,
-		"two or more players are sometimes queued at once",
-		map[string]any{"queued_players": len(q.queued)},
-	)
+	assert.Sometimes(len(q.queued) > 2, "more than two players are sometimes queued", nil)
 
-	// match players
-	var matches []match
-	for _, a := range q.queued {
-		for _, b := range q.queued {
-			if a == b {
+	candidates := q.sortedQueuedCandidates()
+	matches := make([]match, 0, len(candidates)/2)
+	paired := make(map[internal.PlayerID]struct{}, len(candidates))
+	for i, a := range candidates {
+		if _, alreadyPaired := paired[a.pid]; alreadyPaired {
+			continue
+		}
+		for j := i + 1; j < len(candidates); j++ {
+			b := candidates[j]
+			if _, alreadyPaired := paired[b.pid]; alreadyPaired {
 				continue
 			}
-			matchesGame := a.game == nil || b.game == nil || a.game == b.game
-			if matchesGame && internal.MatchElo(a.elo, b.elo, a.entry, b.entry) {
-				chosenGame := a.game
-				if chosenGame == nil {
-					chosenGame = b.game
-				}
-				if chosenGame == nil {
-					chosenGame = &game.AllGames[q.rng.Intn(len(game.AllGames))]
-					assert.Reachable(
-						"matchmaker sometimes selects a random game for wildcard players",
-						nil,
-					)
-				}
-				assert.Reachable(
-					"matchmaker found a pair of compatible players",
-					map[string]any{
-						"p1":   a.pid.String(),
-						"p2":   b.pid.String(),
-						"game": string(*chosenGame),
-					},
-				)
-				matches = append(matches, match{a: a, b: b, game: *chosenGame})
-				break
+
+			chosenGame, matchesGame := selectMatchGame(a.game, b.game)
+			if !matchesGame {
+				continue
 			}
+			if !internal.MatchElo(a.elo, b.elo, a.entry, b.entry) {
+				continue
+			}
+
+			assert.Reachable("matchmaker found a pair of compatible players", nil)
+			paired[a.pid] = struct{}{}
+			paired[b.pid] = struct{}{}
+			matches = append(matches, match{a: a, b: b, game: chosenGame})
+			break
 		}
 	}
 	return matches
+}
+
+// sortedQueuedCandidates returns queued players ordered by queue entry time
+// (oldest first), with player ID as a deterministic tie-breaker.
+func (q *MatchQueue) sortedQueuedCandidates() []*candidate {
+	candidates := make([]*candidate, 0, len(q.queued))
+	for _, candidate := range q.queued {
+		candidates = append(candidates, candidate)
+	}
+	sort.Slice(candidates, func(i, j int) bool {
+		if candidates[i].entry.Equal(candidates[j].entry) {
+			return candidates[i].pid.String() < candidates[j].pid.String()
+		}
+		return candidates[i].entry.Before(candidates[j].entry)
+	})
+	return candidates
+}
+
+func selectMatchGame(a, b *game.Kind) (game.Kind, bool) {
+	// if both players have a game preference, they must match
+	if a != nil && b != nil {
+		return *a, *a == *b
+	}
+	// if only one player has a preference, use that
+	if a == nil && b != nil {
+		return *b, true
+	}
+	if b == nil && a != nil {
+		return *a, true
+	}
+	// otherwise select a random game
+	if len(game.AllGames) == 0 {
+		return "", false
+	}
+	idx := internal.NewRand().Intn(len(game.AllGames))
+	return game.AllGames[idx], true
 }
 
 func (q *MatchQueue) publishMatch(session *SessionInfo, a, b *candidate) {
@@ -186,11 +211,16 @@ func (q *MatchQueue) Queue(player *PlayerModel, game *game.Kind) (*SessionInfo, 
 	}
 
 	// Player is not yet matched, make sure they are in the queue
-	q.queued[player.PlayerID] = &candidate{
-		pid:   player.PlayerID,
-		elo:   player.Elo,
-		entry: time.Now(),
-		game:  game,
+	if existing, ok := q.queued[player.PlayerID]; ok {
+		existing.elo = player.Elo
+		existing.game = game
+	} else {
+		q.queued[player.PlayerID] = &candidate{
+			pid:   player.PlayerID,
+			elo:   player.Elo,
+			entry: time.Now(),
+			game:  game,
+		}
 	}
 	return nil, nil
 }

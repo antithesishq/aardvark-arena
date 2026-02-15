@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// DefaultSpecificGameSelectionRate determines the probability a player will select a specific game to queue for.
 const DefaultSpecificGameSelectionRate = 0.20
 
 // Config holds player configuration.
