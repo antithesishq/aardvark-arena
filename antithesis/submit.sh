@@ -46,44 +46,34 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -n "$REGISTRY" ]]; then
-  SERVICE_IMAGE="${REGISTRY}/aardvark-arena-service:latest"
-  PLAYER_IMAGE="${REGISTRY}/aardvark-arena-player:latest"
-  HEALTH_CHECKER_IMAGE="${REGISTRY}/aardvark-arena-health-checker:latest"
-  CONFIG_IMAGE="${REGISTRY}/aardvark-arena-config:latest"
-else
-  SERVICE_IMAGE="aardvark-arena-service"
-  PLAYER_IMAGE="aardvark-arena-player"
-  HEALTH_CHECKER_IMAGE="aardvark-arena-health-checker"
-  CONFIG_IMAGE="aardvark-arena-config"
-fi
-
-# Build images
-docker build --platform linux/amd64 -f antithesis/Dockerfile --target service -t "$SERVICE_IMAGE" .
-docker build --platform linux/amd64 -f antithesis/Dockerfile --target player -t "$PLAYER_IMAGE" .
-docker build --platform linux/amd64 -f antithesis/Dockerfile --target health-checker -t "$HEALTH_CHECKER_IMAGE" .
-docker build --platform linux/amd64 -f antithesis/Dockerfile --target config -t "$CONFIG_IMAGE" .
-
 if [[ -z "$REGISTRY" ]]; then
-  echo "Build complete (no --registry): skipped push and test run."
-  exit 0
+  echo "Error: --registry is required." >&2
+  usage
+  exit 1
 fi
 
-# Push images (required before snouty run)
+export ANTITHESIS_REPOSITORY="$REGISTRY"
+
+SERVICE_IMAGE="${REGISTRY}/aardvark-arena-service:latest"
+PLAYER_IMAGE="${REGISTRY}/aardvark-arena-player:latest"
+HEALTH_CHECKER_IMAGE="${REGISTRY}/aardvark-arena-health-checker:latest"
+
+# Build and push images (snouty --config handles the config image automatically)
+docker build --platform linux/amd64 -f antithesis/Dockerfile --target service        -t "$SERVICE_IMAGE"        .
+docker build --platform linux/amd64 -f antithesis/Dockerfile --target player         -t "$PLAYER_IMAGE"         .
+docker build --platform linux/amd64 -f antithesis/Dockerfile --target health-checker -t "$HEALTH_CHECKER_IMAGE" .
 docker push "$SERVICE_IMAGE"
 docker push "$PLAYER_IMAGE"
 docker push "$HEALTH_CHECKER_IMAGE"
-docker push "$CONFIG_IMAGE"
 
 GIT_REV="$(git rev-parse HEAD)"
-RUN_DESCRIPTION="aardvark-arena antithesis test (rev ${GIT_REV})"
+RUN_DESCRIPTION="[${USER}] ${GIT_REV}"
 
-# Submit test run
+# Submit test run (snouty builds and pushes config image from antithesis/docker-compose.yaml)
 snouty run \
   --webhook basic_test \
+  --config antithesis \
   --test-name 'aardvark-arena' \
   --description "$RUN_DESCRIPTION" \
-  --config-image "$CONFIG_IMAGE" \
   --duration "$DURATION" \
-  --recipients 'alex.carcoana@antithesis.com' \
-  --param "antithesis.images=$SERVICE_IMAGE;$PLAYER_IMAGE;$HEALTH_CHECKER_IMAGE"
+  --recipients 'alex.carcoana@antithesis.com'
