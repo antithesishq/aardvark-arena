@@ -2,8 +2,8 @@
 set -euo pipefail
 
 usage() {
-  echo "Usage: $0 [--duration minutes]" >&2
-  echo "  Requires ANTITHESIS_REPOSITORY env var to be set." >&2
+  echo "Usage: $0 [--duration minutes] [--registry <registry>]" >&2
+  echo "  Registry can also be set via ANTITHESIS_REPOSITORY env var." >&2
 }
 
 DURATION="15"
