@@ -2,11 +2,11 @@
 set -euo pipefail
 
 usage() {
-  echo "Usage: $0 [--duration seconds] [--registry <registry>]" >&2
-  echo "  Note: without --registry, this script runs in build-only mode." >&2
+  echo "Usage: $0 [--duration minutes]" >&2
+  echo "  Requires ANTITHESIS_REPOSITORY env var to be set." >&2
 }
 
-DURATION="60"
+DURATION="15"
 REGISTRY=""
 
 while [[ $# -gt 0 ]]; do
@@ -81,9 +81,9 @@ RUN_DESCRIPTION="aardvark-arena antithesis test (rev ${GIT_REV})"
 # Submit test run
 snouty run \
   --webhook basic_test \
-  --antithesis.test_name 'aardvark-arena' \
-  --antithesis.description "$RUN_DESCRIPTION" \
-  --antithesis.config_image "$CONFIG_IMAGE" \
-  --antithesis.images "$SERVICE_IMAGE;$PLAYER_IMAGE;$HEALTH_CHECKER_IMAGE" \
-  --antithesis.duration "$DURATION" \
-  --antithesis.report.recipients 'alex.carcoana@antithesis.com'
+  --test-name 'aardvark-arena' \
+  --description "$RUN_DESCRIPTION" \
+  --config-image "$CONFIG_IMAGE" \
+  --duration "$DURATION" \
+  --recipients 'alex.carcoana@antithesis.com' \
+  --param "antithesis.images=$SERVICE_IMAGE;$PLAYER_IMAGE;$HEALTH_CHECKER_IMAGE"
