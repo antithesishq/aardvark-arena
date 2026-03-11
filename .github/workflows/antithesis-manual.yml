@@ -32,7 +32,7 @@ jobs:
       - uses: antithesishq/antithesis-trigger-action@v0.8
         with:
           notebook_name: basic_test
-          tenant: honey-pwhale
+          tenant: honey-whale
           username: ${{ secrets.ANTITHESIS_USERNAME }}
           password: ${{ secrets.ANTITHESIS_PASSWORD }}
           github_token: ${{ secrets.GH_PAT }}
@@ -43,4 +43,5 @@ jobs:
             us-central1-docker.pkg.dev/molten-verve-216720/honey-pwhale-repository/aardvark-arena-health-checker:${{ github.sha }}
           description: "aardvark-arena"
           email_recipients: alex.carcoana@antithesis.com
-          duration_minutes: "15"
+          additional_parameters: |-
+            antithesis.duration=15
