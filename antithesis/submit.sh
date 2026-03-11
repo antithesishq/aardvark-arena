@@ -86,4 +86,4 @@ snouty run \
   --antithesis.config_image "$CONFIG_IMAGE" \
   --antithesis.images "$SERVICE_IMAGE;$PLAYER_IMAGE;$HEALTH_CHECKER_IMAGE" \
   --antithesis.duration "$DURATION" \
-  --antithesis.report.recipients 'antithesis-results@orbitinghail.dev'
+  --antithesis.report.recipients 'alex.carcoana@antithesis.com'
