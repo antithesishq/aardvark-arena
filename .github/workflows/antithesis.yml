@@ -19,7 +19,7 @@ jobs:
 
       - name: Build and push images
         env:
-          REGISTRY: us-central1-docker.pkg.dev/molten-verve-216720/honey-whale-repository
+          REGISTRY: us-central1-docker.pkg.dev/molten-verve-216720/honey-pwhale-repository
         run: |
           docker build --platform linux/amd64 -f antithesis/Dockerfile --target service  -t "$REGISTRY/aardvark-arena-service:${{ github.sha }}"  .
           docker build --platform linux/amd64 -f antithesis/Dockerfile --target player  -t "$REGISTRY/aardvark-arena-player:${{ github.sha }}"  .
@@ -33,15 +33,15 @@ jobs:
       - uses: antithesishq/antithesis-trigger-action@v0.8
         with:
           notebook_name: basic_test
-          tenant: honey-whale
+          tenant: honey-pwhale
           username: ${{ secrets.ANTITHESIS_USERNAME }}
           password: ${{ secrets.ANTITHESIS_PASSWORD }}
           github_token: ${{ secrets.GH_PAT }}
-          config_image: us-central1-docker.pkg.dev/molten-verve-216720/honey-whale-repository/aardvark-arena-config:${{ github.sha }}
+          config_image: us-central1-docker.pkg.dev/molten-verve-216720/honey-pwhale-repository/aardvark-arena-config:${{ github.sha }}
           images: >-
-            us-central1-docker.pkg.dev/molten-verve-216720/honey-whale-repository/aardvark-arena-service:${{ github.sha }};
-            us-central1-docker.pkg.dev/molten-verve-216720/honey-whale-repository/aardvark-arena-player:${{ github.sha }};
-            us-central1-docker.pkg.dev/molten-verve-216720/honey-whale-repository/aardvark-arena-health-checker:${{ github.sha }}
+            us-central1-docker.pkg.dev/molten-verve-216720/honey-pwhale-repository/aardvark-arena-service:${{ github.sha }};
+            us-central1-docker.pkg.dev/molten-verve-216720/honey-pwhale-repository/aardvark-arena-player:${{ github.sha }};
+            us-central1-docker.pkg.dev/molten-verve-216720/honey-pwhale-repository/aardvark-arena-health-checker:${{ github.sha }}
           description: "aardvark-arena"
           email_recipients: alex.carcoana@antithesis.com
           duration_minutes: "15"
