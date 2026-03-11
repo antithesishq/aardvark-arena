@@ -37,10 +37,7 @@ jobs:
           password: ${{ secrets.ANTITHESIS_PASSWORD }}
           github_token: ${{ secrets.GH_PAT }}
           config_image: us-central1-docker.pkg.dev/molten-verve-216720/honey-pwhale-repository/aardvark-arena-config:${{ github.sha }}
-          images: >-
-            us-central1-docker.pkg.dev/molten-verve-216720/honey-pwhale-repository/aardvark-arena-service:${{ github.sha }};
-            us-central1-docker.pkg.dev/molten-verve-216720/honey-pwhale-repository/aardvark-arena-player:${{ github.sha }};
-            us-central1-docker.pkg.dev/molten-verve-216720/honey-pwhale-repository/aardvark-arena-health-checker:${{ github.sha }}
+          images: "us-central1-docker.pkg.dev/molten-verve-216720/honey-pwhale-repository/aardvark-arena-service:${{ github.sha }};us-central1-docker.pkg.dev/molten-verve-216720/honey-pwhale-repository/aardvark-arena-player:${{ github.sha }};us-central1-docker.pkg.dev/molten-verve-216720/honey-pwhale-repository/aardvark-arena-health-checker:${{ github.sha }}"
           description: "[${{ github.actor }}] aardvark-arena"
           email_recipients: alex.carcoana@antithesis.com
           additional_parameters: |-
