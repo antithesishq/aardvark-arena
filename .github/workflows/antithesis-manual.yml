@@ -18,7 +18,7 @@ jobs:
 
       - name: Build and push images
         env:
-          REGISTRY: us-central1-docker.pkg.dev/molten-verve-216720/honey-whale
+          REGISTRY: us-central1-docker.pkg.dev/molten-verve-216720/honey-whale-repository
         run: |
           docker build --platform linux/amd64 -f antithesis/Dockerfile --target service        -t "$REGISTRY/aardvark-arena-service:${{ github.sha }}"        .
           docker build --platform linux/amd64 -f antithesis/Dockerfile --target player         -t "$REGISTRY/aardvark-arena-player:${{ github.sha }}"         .
@@ -36,11 +36,11 @@ jobs:
           username: ${{ secrets.ANTITHESIS_USERNAME }}
           password: ${{ secrets.ANTITHESIS_PASSWORD }}
           github_token: ${{ secrets.GH_PAT }}
-          config_image: us-central1-docker.pkg.dev/molten-verve-216720/honey-whale/aardvark-arena-config:${{ github.sha }}
+          config_image: us-central1-docker.pkg.dev/molten-verve-216720/honey-whale-repository/aardvark-arena-config:${{ github.sha }}
           images: >-
-            us-central1-docker.pkg.dev/molten-verve-216720/honey-whale/aardvark-arena-service:${{ github.sha }};
-            us-central1-docker.pkg.dev/molten-verve-216720/honey-whale/aardvark-arena-player:${{ github.sha }};
-            us-central1-docker.pkg.dev/molten-verve-216720/honey-whale/aardvark-arena-health-checker:${{ github.sha }}
+            us-central1-docker.pkg.dev/molten-verve-216720/honey-whale-repository/aardvark-arena-service:${{ github.sha }};
+            us-central1-docker.pkg.dev/molten-verve-216720/honey-whale-repository/aardvark-arena-player:${{ github.sha }};
+            us-central1-docker.pkg.dev/molten-verve-216720/honey-whale-repository/aardvark-arena-health-checker:${{ github.sha }}
           description: "aardvark-arena"
           email_recipients: alex.carcoana@antithesis.com
           duration_minutes: "15"
