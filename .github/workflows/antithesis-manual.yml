@@ -41,7 +41,7 @@ jobs:
             us-central1-docker.pkg.dev/molten-verve-216720/honey-pwhale-repository/aardvark-arena-service:${{ github.sha }};
             us-central1-docker.pkg.dev/molten-verve-216720/honey-pwhale-repository/aardvark-arena-player:${{ github.sha }};
             us-central1-docker.pkg.dev/molten-verve-216720/honey-pwhale-repository/aardvark-arena-health-checker:${{ github.sha }}
-          description: "aardvark-arena"
+          description: "[${{ github.actor }}] aardvark-arena"
           email_recipients: alex.carcoana@antithesis.com
           additional_parameters: |-
             antithesis.duration=15
