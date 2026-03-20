@@ -215,3 +215,42 @@ func (h *sessionHandle) Join(pid internal.PlayerID, conn *websocket.Conn) {
 		}
 	}()
 }
+
+// SessionSummary is a brief view of an active session.
+type SessionSummary struct {
+	SessionID internal.SessionID `json:"session_id"`
+	Game      game.Kind          `json:"game"`
+}
+
+// ListSessions returns all currently active (unfinished) sessions.
+func (s *SessionManager) ListSessions() []SessionSummary {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	result := make([]SessionSummary, 0, len(s.sessions))
+	for sid, handle := range s.sessions {
+		if !handle.IsFinished() {
+			result = append(result, SessionSummary{
+				SessionID: sid,
+				Game:      handle.game,
+			})
+		}
+	}
+	return result
+}
+
+// WatchSession registers a spectator channel on the given session.
+func (s *SessionManager) WatchSession(sid internal.SessionID) (chan PlayerMsg, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	handle, ok := s.sessions[sid]
+	if !ok || handle.IsFinished() {
+		return nil, fmt.Errorf("session %s not found or already finished", sid)
+	}
+	ch := make(chan PlayerMsg, 1)
+	select {
+	case handle.inbox <- inboxMsg{spectatorCh: ch}:
+	case <-handle.ctx.Done():
+		return nil, fmt.Errorf("session %s ended before spectator could join", sid)
+	}
+	return ch, nil
+}

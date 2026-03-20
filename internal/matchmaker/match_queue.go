@@ -244,3 +244,25 @@ func (q *MatchQueue) Untrack(sid internal.SessionID) {
 		}
 	}
 }
+
+// QueuedPlayer is a player currently waiting in the match queue.
+type QueuedPlayer struct {
+	PlayerID    internal.PlayerID `json:"player_id"`
+	Elo         int               `json:"elo"`
+	WaitSeconds float64           `json:"wait_seconds"`
+}
+
+// QueuedPlayers returns a snapshot of all players currently in the queue.
+func (q *MatchQueue) QueuedPlayers() []QueuedPlayer {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	result := make([]QueuedPlayer, 0, len(q.queued))
+	for _, c := range q.queued {
+		result = append(result, QueuedPlayer{
+			PlayerID:    c.pid,
+			Elo:         c.elo,
+			WaitSeconds: time.Since(c.entry).Seconds(),
+		})
+	}
+	return result
+}

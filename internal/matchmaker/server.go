@@ -63,7 +63,7 @@ func New(ctx context.Context, cfg Config) (*Server, error) {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.mux.ServeHTTP(w, r)
+	internal.CORS(s.mux).ServeHTTP(w, r)
 }
 
 func (s *Server) routes() {
@@ -71,6 +71,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("PUT /queue/{pid}", s.handleQueue)
 	s.mux.HandleFunc("DELETE /queue/{pid}", s.handleUnqueue)
 	s.mux.HandleFunc("PUT /results/{sid}", internal.TokenAuth(s.cfg.Token, s.handleResult))
+	s.mux.HandleFunc("GET /status", s.handleStatus)
+	s.mux.HandleFunc("GET /leaderboard", s.handleLeaderboard)
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
@@ -162,4 +164,31 @@ func (s *Server) handleResult(w http.ResponseWriter, r *http.Request) {
 	}
 	s.queue.Untrack(sid)
 	_, _ = w.Write([]byte("ok"))
+}
+
+// StatusResponse is the payload for GET /status.
+type StatusResponse struct {
+	Queue    []QueuedPlayer      `json:"queue"`
+	Sessions []ActiveSessionView `json:"sessions"`
+}
+
+func (s *Server) handleStatus(w http.ResponseWriter, _ *http.Request) {
+	sessions, err := s.db.ActiveSessions()
+	if err != nil {
+		internal.WriteError(w, http.StatusInternalServerError, err)
+		return
+	}
+	_ = internal.RespondJSON(w, StatusResponse{
+		Queue:    s.queue.QueuedPlayers(),
+		Sessions: sessions,
+	})
+}
+
+func (s *Server) handleLeaderboard(w http.ResponseWriter, _ *http.Request) {
+	players, err := s.db.Leaderboard()
+	if err != nil {
+		internal.WriteError(w, http.StatusInternalServerError, err)
+		return
+	}
+	_ = internal.RespondJSON(w, players)
 }
