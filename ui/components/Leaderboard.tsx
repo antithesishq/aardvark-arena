@@ -1,13 +1,7 @@
 "use client";
 
 import { LeaderboardEntry } from "@/lib/api";
-
-const mono = { fontFamily: "var(--font-geist-mono)" };
-const geist = { fontFamily: "var(--font-geist)" };
-
-function shortId(id: string) {
-  return id.slice(0, 8);
-}
+import { mono, geist, shortId8 } from "@/lib/utils";
 
 interface Props {
   entries: LeaderboardEntry[];
@@ -42,7 +36,7 @@ export function Leaderboard({ entries }: Props) {
           )}
           {entries.map((e) => (
             <tr key={e.PlayerID} className="border-b border-zinc-800/50 last:border-0">
-              <td className="py-2.5 text-zinc-200" style={mono}>{shortId(e.PlayerID)}</td>
+              <td className="py-2.5 text-zinc-200" style={mono}>{shortId8(e.PlayerID)}</td>
               <td className="py-2.5">
                 <div className="flex items-center gap-2">
                   <span className="text-zinc-300 tabular-nums w-12" style={mono}>{e.Elo}</span>

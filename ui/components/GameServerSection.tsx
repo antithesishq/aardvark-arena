@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { SessionSummary, fetchSessions, fetchHealth, HealthResponse } from "@/lib/api";
 import { GameCard } from "./GameCard";
 import { OnlineBadge, DegradedBadge } from "./badges";
+import { mono } from "@/lib/utils";
 
 interface Props {
   serverUrl: string;
@@ -59,7 +60,7 @@ export function GameServerSection({ serverUrl, label }: Props) {
     <div className="mb-8">
       {/* Section header */}
       <div className="flex items-center gap-3 mb-3 border-b border-zinc-800 pb-2">
-        <span className="text-sm font-bold text-zinc-300 tracking-widest" style={{ fontFamily: "var(--font-geist-mono)" }}>{label}</span>
+        <span className="text-sm font-bold text-zinc-300 tracking-widest" style={mono}>{label}</span>
         {isDegraded ? <DegradedBadge /> : <OnlineBadge />}
         <span className="ml-auto text-xs text-zinc-400">
           {sessionCount} session{sessionCount !== 1 ? "s" : ""} active
@@ -67,7 +68,7 @@ export function GameServerSection({ serverUrl, label }: Props) {
       </div>
 
       {fetchError && (
-        <div className="text-xs text-red-400 py-2 mb-2" style={{ fontFamily: "var(--font-geist-mono)" }}>
+        <div className="text-xs text-red-400 py-2 mb-2" style={mono}>
           Cannot reach server: {fetchError}
         </div>
       )}

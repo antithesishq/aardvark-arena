@@ -1,21 +1,8 @@
 "use client";
 
 import { QueuedPlayer } from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { cn, mono, geist, shortId8, fmtSeconds } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-
-const mono = { fontFamily: "var(--font-geist-mono)" };
-const geist = { fontFamily: "var(--font-geist)" };
-
-function shortId(id: string) {
-  return id.slice(0, 8);
-}
-
-function fmtWait(s: number) {
-  const m = Math.floor(s / 60);
-  const sec = Math.floor(s % 60);
-  return `${m}:${String(sec).padStart(2, "0")}`;
-}
 
 function waitColor(s: number) {
   if (s < 60) return "bg-violet-500";
@@ -53,7 +40,7 @@ export function PlayerQueue({ queue }: Props) {
           )}
           {queue.map((p) => (
             <tr key={p.player_id} className="border-b border-zinc-800/50 last:border-0">
-              <td className="py-2.5 text-zinc-200" style={mono}>{shortId(p.player_id)}</td>
+              <td className="py-2.5 text-zinc-200" style={mono}>{shortId8(p.player_id)}</td>
               <td className="py-2.5 text-zinc-400" style={mono}>{p.elo}</td>
               <td className="py-2.5">
                 <div className="flex items-center gap-2">
@@ -61,7 +48,7 @@ export function PlayerQueue({ queue }: Props) {
                     "text-xs tabular-nums",
                     p.wait_seconds > 120 ? "text-red-400" : p.wait_seconds > 60 ? "text-amber-400" : "text-zinc-300"
                   )}>
-                    {fmtWait(p.wait_seconds)}
+                    {fmtSeconds(p.wait_seconds)}
                   </span>
                   <div className="w-24 h-1 bg-zinc-800 rounded-full overflow-hidden">
                     <div

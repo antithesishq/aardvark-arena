@@ -1,6 +1,4 @@
-import { cn } from "@/lib/utils";
-
-const mono = { fontFamily: "var(--font-geist-mono)" };
+import { cn, mono } from "@/lib/utils";
 
 const gameColors: Record<string, string> = {
   tictactoe: "bg-violet-900 text-violet-200 border-violet-700",
@@ -62,14 +60,6 @@ export function DegradedBadge() {
     <span style={mono} className="flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-bold tracking-widest bg-amber-900/60 text-amber-400 border border-amber-700 rounded">
       <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
       DEGRADED
-    </span>
-  );
-}
-
-export function RunningBadge({ count }: { count: number }) {
-  return (
-    <span style={mono} className="px-2 py-0.5 text-[10px] font-bold tracking-widest bg-emerald-900/60 text-emerald-400 border border-emerald-700 rounded">
-      {count} RUNNING
     </span>
   );
 }

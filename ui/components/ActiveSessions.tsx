@@ -4,29 +4,7 @@ import { useState } from "react";
 import { ActiveSession, cancelSessionViaMatchmaker } from "@/lib/api";
 import { GameBadgeShort } from "./badges";
 import { Button } from "@/components/ui/button";
-
-const mono = { fontFamily: "var(--font-geist-mono)" };
-const geist = { fontFamily: "var(--font-geist)" };
-
-function shortId(id: string) {
-  return "#" + id.slice(0, 4);
-}
-
-function fmtElapsed(createdAt: string) {
-  const s = Math.floor((Date.now() - new Date(createdAt).getTime()) / 1000);
-  const m = Math.floor(s / 60);
-  const sec = s % 60;
-  return `${m}:${String(sec).padStart(2, "0")}`;
-}
-
-function serverLabel(serverUrl: string) {
-  try {
-    const u = new URL(serverUrl);
-    return u.hostname.toUpperCase();
-  } catch {
-    return serverUrl;
-  }
-}
+import { mono, geist, shortId4, fmtSeconds, serverHostname } from "@/lib/utils";
 
 interface Props {
   sessions: ActiveSession[];
@@ -89,13 +67,13 @@ export function ActiveSessions({ sessions }: Props) {
           )}
           {sessions.map((s) => (
             <tr key={s.session_id} className="border-b border-zinc-800/50 last:border-0">
-              <td className="py-2.5" style={mono}><span className="text-zinc-400">{shortId(s.session_id)}</span></td>
+              <td className="py-2.5" style={mono}><span className="text-zinc-400">{shortId4(s.session_id)}</span></td>
               <td className="py-2.5 text-zinc-300" style={geist}>
                 {s.player_ids.map((id) => id.slice(0, 8)).join(" vs ")}
               </td>
               <td className="py-2.5"><GameBadgeShort game={s.game} /></td>
-              <td className="py-2.5 text-zinc-400 text-xs" style={mono}>{serverLabel(s.server)}</td>
-              <td className="py-2.5 text-xs text-zinc-300 tabular-nums" style={mono}>{fmtElapsed(s.created_at)}</td>
+              <td className="py-2.5 text-zinc-400 text-xs" style={mono}>{serverHostname(s.server)}</td>
+              <td className="py-2.5 text-xs text-zinc-300 tabular-nums" style={mono}>{fmtSeconds(Math.floor((Date.now() - new Date(s.created_at).getTime()) / 1000))}</td>
               <td className="py-2.5 text-right">
                 <CancelButton session={s} />
               </td>

@@ -8,10 +8,7 @@ import { Button } from "@/components/ui/button";
 import { TicTacToeBoard } from "./boards/TicTacToeBoard";
 import { Connect4Board } from "./boards/Connect4Board";
 import { BattleshipBoard } from "./boards/BattleshipBoard";
-
-function shortId(id: string) {
-  return "#" + id.slice(0, 4);
-}
+import { mono, shortId4, fmtSeconds } from "@/lib/utils";
 
 interface GameState {
   CurrentPlayer: number;
@@ -41,11 +38,6 @@ interface Props {
   elapsedSeconds: number;
 }
 
-function fmtTime(s: number) {
-  const m = Math.floor(s / 60);
-  const sec = s % 60;
-  return `${m}:${String(sec).padStart(2, "0")}`;
-}
 
 export function GameCard({ session, serverUrl, elapsedSeconds }: Props) {
   const [lastMsg, setLastMsg] = useState<PlayerMsg | null>(null);
@@ -75,7 +67,7 @@ export function GameCard({ session, serverUrl, elapsedSeconds }: Props) {
     <div className="bg-zinc-900/20 border border-zinc-800 rounded backdrop-blur-sm p-3 flex flex-col gap-2 min-w-[240px]">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <span className="text-xs text-zinc-400" style={{ fontFamily: "var(--font-geist-mono)" }}>{shortId(session.session_id)}</span>
+        <span className="text-xs text-zinc-400" style={mono}>{shortId4(session.session_id)}</span>
         <GameBadge game={session.game} />
       </div>
 
@@ -95,13 +87,13 @@ export function GameCard({ session, serverUrl, elapsedSeconds }: Props) {
       {/* Footer */}
       <div className="flex flex-col gap-1">
         <div className="flex items-center justify-between border-t border-zinc-800 pt-2">
-          <span className="text-xs text-zinc-400 tabular-nums" style={{ fontFamily: "var(--font-geist-mono)" }}>
-            ⏱ {fmtTime(elapsedSeconds)} · Turn {turnCount(gameState, session.game)}
+          <span className="text-xs text-zinc-400 tabular-nums" style={mono}>
+            ⏱ {fmtSeconds(elapsedSeconds)} · Turn {turnCount(gameState, session.game)}
           </span>
           <Button
             size="sm"
             variant="destructive"
-            style={{ fontFamily: "var(--font-geist-mono)" }}
+            style={mono}
             onClick={handleCancel}
             disabled={cancelling}
           >
@@ -109,7 +101,7 @@ export function GameCard({ session, serverUrl, elapsedSeconds }: Props) {
           </Button>
         </div>
         {cancelError && (
-          <span className="text-xs text-red-400" style={{ fontFamily: "var(--font-geist-mono)" }}>{cancelError}</span>
+          <span className="text-xs text-red-400" style={mono}>{cancelError}</span>
         )}
       </div>
     </div>
