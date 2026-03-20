@@ -341,6 +341,17 @@ func (db *DB) ReportSessionResult(
 	return tx.Commit()
 }
 
+const selectSessionByID = `
+	SELECT session_id, server, game, created_at, deadline, completed_at, cancelled, winner_id
+	FROM sessions WHERE session_id = ?
+`
+
+// GetSession returns the session with the given ID, or sql.ErrNoRows if not found.
+func (db *DB) GetSession(sid internal.SessionID) (*SessionModel, error) {
+	var s SessionModel
+	return &s, db.db.Get(&s, selectSessionByID, sid)
+}
+
 const selectActiveSessions = `
 	SELECT s.session_id, s.server, s.game, s.created_at, s.deadline
 	FROM sessions s

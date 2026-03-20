@@ -51,3 +51,12 @@ export const fetchSessions = (serverUrl: string) =>
   get<SessionSummary[]>(`${serverUrl}/sessions`);
 export const fetchHealth = (serverUrl: string) =>
   get<HealthResponse>(`${serverUrl}/health`);
+
+// Cancel via the matchmaker — it proxies to the game server and handles the
+// case where the session already finished on the game server side.
+export const cancelSessionViaMatchmaker = (sessionId: string) =>
+  fetch(`${MM}/session/${sessionId}`, { method: "DELETE" });
+
+// Cancel directly on a game server (used from the game server tab).
+export const cancelSession = (serverUrl: string, sessionId: string) =>
+  fetch(`${serverUrl}/session/${sessionId}`, { method: "DELETE" });

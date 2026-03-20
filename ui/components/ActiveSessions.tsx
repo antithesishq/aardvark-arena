@@ -1,6 +1,7 @@
 "use client";
 
-import { ActiveSession } from "@/lib/api";
+import { useState } from "react";
+import { ActiveSession, cancelSessionViaMatchmaker } from "@/lib/api";
 import { GameBadgeShort } from "./badges";
 import { Button } from "@/components/ui/button";
 
@@ -31,6 +32,33 @@ interface Props {
   sessions: ActiveSession[];
 }
 
+function CancelButton({ session }: { session: ActiveSession }) {
+  const [cancelling, setCancelling] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleCancel() {
+    setCancelling(true);
+    setError(null);
+    try {
+      const res = await cancelSessionViaMatchmaker(session.session_id);
+      if (!res.ok) setError(`${res.status}`);
+    } catch {
+      setError("Network error");
+    } finally {
+      setCancelling(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-0.5">
+      <Button size="sm" variant="destructive" style={mono} onClick={handleCancel} disabled={cancelling}>
+        {cancelling ? "Cancelling…" : "Cancel"}
+      </Button>
+      {error && <span className="text-[10px] text-red-400" style={mono}>{error}</span>}
+    </div>
+  );
+}
+
 export function ActiveSessions({ sessions }: Props) {
   return (
     <div className="bg-zinc-900/20 border border-zinc-800 rounded backdrop-blur-sm py-2 px-3 h-[350px] overflow-y-auto">
@@ -54,7 +82,7 @@ export function ActiveSessions({ sessions }: Props) {
         <tbody>
           {sessions.length === 0 && (
             <tr>
-              <td colSpan={6} className="py-4 text-center text-zinc-600 text-xs" style={geist}>
+              <td colSpan={6} className="py-4 text-center text-zinc-400 text-xs" style={geist}>
                 No active sessions
               </td>
             </tr>
@@ -69,7 +97,7 @@ export function ActiveSessions({ sessions }: Props) {
               <td className="py-2.5 text-zinc-400 text-xs" style={mono}>{serverLabel(s.server)}</td>
               <td className="py-2.5 text-xs text-zinc-300 tabular-nums" style={mono}>{fmtElapsed(s.created_at)}</td>
               <td className="py-2.5 text-right">
-                <Button size="sm" variant="destructive" style={mono}>Cancel</Button>
+                <CancelButton session={s} />
               </td>
             </tr>
           ))}

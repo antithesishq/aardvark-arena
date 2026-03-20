@@ -14,6 +14,7 @@ export function GameServerSection({ serverUrl, label }: Props) {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [startTimes, setStartTimes] = useState<Record<string, number>>({});
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -24,6 +25,7 @@ export function GameServerSection({ serverUrl, label }: Props) {
         if (cancelled) return;
         setHealth(h);
         setSessions(s ?? []);
+        setFetchError(null);
         setStartTimes((prev) => {
           const next = { ...prev };
           for (const sess of s ?? []) {
@@ -31,13 +33,13 @@ export function GameServerSection({ serverUrl, label }: Props) {
           }
           return next;
         });
-      } catch {
-        // server unreachable — keep last state
+      } catch (e) {
+        if (!cancelled) setFetchError(String(e));
       }
     }
 
     poll();
-    const id = setInterval(poll, 3000);
+    const id = setInterval(poll, 500);
     return () => {
       cancelled = true;
       clearInterval(id);
@@ -64,9 +66,15 @@ export function GameServerSection({ serverUrl, label }: Props) {
         </span>
       </div>
 
+      {fetchError && (
+        <div className="text-xs text-red-400 py-2 mb-2" style={{ fontFamily: "var(--font-geist-mono)" }}>
+          Cannot reach server: {fetchError}
+        </div>
+      )}
+
       {/* Game cards */}
       {sessionCount === 0 ? (
-        <div className="text-xs text-zinc-600 py-4 text-center">No active sessions</div>
+        <div className="text-xs text-zinc-400 py-4 text-center">No active sessions</div>
       ) : (
         <div className="flex flex-wrap gap-4">
           {sessions.map((s) => (

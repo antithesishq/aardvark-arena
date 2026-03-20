@@ -3,6 +3,8 @@ package matchmaker
 
 import (
 	"context"
+	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"time"
@@ -73,6 +75,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("PUT /results/{sid}", internal.TokenAuth(s.cfg.Token, s.handleResult))
 	s.mux.HandleFunc("GET /status", s.handleStatus)
 	s.mux.HandleFunc("GET /leaderboard", s.handleLeaderboard)
+	s.mux.HandleFunc("DELETE /session/{sid}", s.handleCancelSession)
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
@@ -182,6 +185,46 @@ func (s *Server) handleStatus(w http.ResponseWriter, _ *http.Request) {
 		Queue:    s.queue.QueuedPlayers(),
 		Sessions: sessions,
 	})
+}
+
+func (s *Server) handleCancelSession(w http.ResponseWriter, r *http.Request) {
+	sid, err := internal.PathUUID(r, "sid")
+	if err != nil {
+		internal.WriteError(w, http.StatusBadRequest, err)
+		return
+	}
+	session, err := s.db.GetSession(sid)
+	if err != nil {
+		internal.WriteError(w, http.StatusNotFound, err)
+		return
+	}
+	if session.CompletedAt.Valid {
+		internal.WriteError(w, http.StatusGone, fmt.Errorf("session already completed"))
+		return
+	}
+
+	// Proxy DELETE to the game server. If it returns 404 the session already
+	// ended there — we still mark it cancelled in the DB.
+	gsURL, err := url.Parse(session.Server)
+	if err == nil {
+		reqURL := gsURL.JoinPath("session", sid.String())
+		req, err2 := http.NewRequest(http.MethodDelete, reqURL.String(), nil)
+		if err2 == nil {
+			resp, err2 := internal.NewHTTPClient().Do(req)
+			if err2 != nil {
+				log.Printf("cancel: could not reach game server %s: %v", session.Server, err2)
+			} else {
+				_ = resp.Body.Close()
+			}
+		}
+	}
+
+	if err := s.db.ReportSessionResult(sid, true, uuid.Nil); err != nil {
+		internal.WriteError(w, http.StatusInternalServerError, err)
+		return
+	}
+	s.queue.Untrack(sid)
+	_, _ = w.Write([]byte("ok"))
 }
 
 func (s *Server) handleLeaderboard(w http.ResponseWriter, _ *http.Request) {

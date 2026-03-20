@@ -59,6 +59,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/session/{sid}/{pid}", s.handleSessionConnect)
 	s.mux.HandleFunc("GET /sessions", s.handleListSessions)
 	s.mux.HandleFunc("GET /session/{sid}/watch", s.handleWatchSession)
+	s.mux.HandleFunc("DELETE /session/{sid}", s.handleCancelSession)
 }
 
 // HealthResponse contains the server health status.
@@ -182,4 +183,17 @@ func (s *Server) handleWatchSession(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	_ = conn.Close(websocket.StatusNormalClosure, "session ended")
+}
+
+func (s *Server) handleCancelSession(w http.ResponseWriter, r *http.Request) {
+	sid, err := internal.PathUUID(r, "sid")
+	if err != nil {
+		internal.WriteError(w, http.StatusBadRequest, err)
+		return
+	}
+	if err := s.sessions.CancelSession(sid); err != nil {
+		internal.WriteError(w, http.StatusNotFound, err)
+		return
+	}
+	_, _ = w.Write([]byte("ok"))
 }

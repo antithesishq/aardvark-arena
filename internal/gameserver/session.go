@@ -145,7 +145,7 @@ func (h *sessionHandle) RunToCompletion(g game.Kind, deadline time.Time, turnTim
 			game.NewState(game.NewTicTacToeBoard()),
 			&game.TicTacToeSession{},
 		)
-		protocol.RunToCompletion()
+		protocol.RunToCompletion(h.ctx.Done())
 	case game.Connect4:
 		protocol := NewProtocol(
 			h.inbox,
@@ -156,7 +156,7 @@ func (h *sessionHandle) RunToCompletion(g game.Kind, deadline time.Time, turnTim
 			game.NewState(game.NewConnect4Board()),
 			&game.Connect4Session{},
 		)
-		protocol.RunToCompletion()
+		protocol.RunToCompletion(h.ctx.Done())
 	case game.Battleship:
 		protocol := NewProtocol(
 			h.inbox,
@@ -167,7 +167,7 @@ func (h *sessionHandle) RunToCompletion(g game.Kind, deadline time.Time, turnTim
 			game.NewState(game.NewBattleshipSharedState()),
 			&game.BattleshipSession{},
 		)
-		protocol.RunToCompletion()
+		protocol.RunToCompletion(h.ctx.Done())
 	default:
 		assert.Unreachable(
 			"session manager should only run supported game kinds",
@@ -214,6 +214,18 @@ func (h *sessionHandle) Join(pid internal.PlayerID, conn *websocket.Conn) {
 			}
 		}
 	}()
+}
+
+// CancelSession cancels a session by its ID.
+func (s *SessionManager) CancelSession(sid internal.SessionID) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	handle, ok := s.sessions[sid]
+	if !ok || handle.IsFinished() {
+		return fmt.Errorf("session %s not found or already finished", sid)
+	}
+	handle.cancel()
+	return nil
 }
 
 // SessionSummary is a brief view of an active session.

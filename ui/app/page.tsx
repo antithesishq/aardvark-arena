@@ -75,7 +75,7 @@ export default function MatchmakerPage() {
 
   const sessions = demo ? DEMO_STATUS.sessions : (status?.sessions ?? []);
   const queue    = demo ? DEMO_STATUS.queue    : (status?.queue ?? []);
-  const board    = demo ? DEMO_LEADERBOARD     : leaderboard;
+  const board    = demo ? DEMO_LEADERBOARD     : (leaderboard ?? []);
 
   return (
     <div className="max-w-7xl mx-auto px-6 space-y-4">
@@ -86,6 +86,11 @@ export default function MatchmakerPage() {
       )}
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        <StatCard
+          label="Total Players"
+          value={sessions.length * 2 + queue.length}
+          sub="playing or queued"
+        />
         <StatCard
           label="Active Sessions"
           value={sessions.length}
@@ -100,11 +105,6 @@ export default function MatchmakerPage() {
           label="Avg Wait Time"
           value={fmtAvgWait(sessions)}
           sub="target < 0:45"
-        />
-        <StatCard
-          label="Leaderboard"
-          value={board.length}
-          sub="tracked players"
         />
       </div>
 

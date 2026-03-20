@@ -107,14 +107,17 @@ func (p *Protocol[M, S]) report(status game.Status) {
 	}
 }
 
-// RunToCompletion runs the game session until it ends or the deadline is reached.
-func (p *Protocol[M, S]) RunToCompletion() {
+// RunToCompletion runs the game session until it ends, the deadline is reached, or done is closed.
+func (p *Protocol[M, S]) RunToCompletion(done <-chan struct{}) {
 	timer := time.NewTimer(time.Until(p.deadline))
 	defer timer.Stop()
 
 outer:
 	for {
 		select {
+		case <-done:
+			p.report(game.Cancelled)
+			break outer
 		case <-timer.C:
 			p.report(game.Cancelled)
 			break outer

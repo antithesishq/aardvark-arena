@@ -33,8 +33,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </header>
         <main className="flex-1 py-6 relative">
           <div
-            className="fixed inset-0 bg-cover bg-center opacity-5 pointer-events-none -z-10"
-            style={{ backgroundImage: "url('/background.avif')", backgroundAttachment: "fixed" }}
+            className="fixed inset-0 bg-cover bg-center pointer-events-none -z-10"
+            style={{ backgroundImage: "url('/background.avif')", backgroundAttachment: "fixed", opacity: 0.06 }}
           />
           <div className="relative z-10">{children}</div>
         </main>

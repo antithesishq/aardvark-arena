@@ -35,7 +35,7 @@ export function Leaderboard({ entries }: Props) {
         <tbody>
           {entries.length === 0 && (
             <tr>
-              <td colSpan={3} className="py-4 text-center text-zinc-600 text-xs" style={geist}>
+              <td colSpan={3} className="py-4 text-center text-zinc-400 text-xs" style={geist}>
                 No players yet
               </td>
             </tr>

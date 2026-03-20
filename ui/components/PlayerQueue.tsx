@@ -46,7 +46,7 @@ export function PlayerQueue({ queue }: Props) {
         <tbody>
           {queue.length === 0 && (
             <tr>
-              <td colSpan={4} className="py-4 text-center text-zinc-600 text-xs" style={geist}>
+              <td colSpan={4} className="py-4 text-center text-zinc-400 text-xs" style={geist}>
                 Queue is empty
               </td>
             </tr>
