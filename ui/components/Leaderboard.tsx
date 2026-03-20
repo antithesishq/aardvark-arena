@@ -1,0 +1,59 @@
+"use client";
+
+import { LeaderboardEntry } from "@/lib/api";
+
+const mono = { fontFamily: "var(--font-geist-mono)" };
+const geist = { fontFamily: "var(--font-geist)" };
+
+function shortId(id: string) {
+  return id.slice(0, 8);
+}
+
+interface Props {
+  entries: LeaderboardEntry[];
+}
+
+export function Leaderboard({ entries }: Props) {
+  const maxElo = Math.max(...entries.map((e) => e.Elo), 1000);
+
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded py-2 px-3">
+      <div className="flex items-start justify-between mb-3">
+        <div>
+          <div className="text-sm font-semibold text-zinc-200" style={geist}>ELO Leaderboard</div>
+          <div className="text-xs text-zinc-500" style={geist}>All-time rankings</div>
+        </div>
+      </div>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-[10px] tracking-widest text-zinc-500 uppercase border-b border-zinc-800" style={mono}>
+            <th className="text-left pb-2 font-medium">Bot</th>
+            <th className="text-left pb-2 font-medium">ELO</th>
+            <th className="text-right pb-2 font-medium">W/L</th>
+          </tr>
+        </thead>
+        <tbody>
+          {entries.map((e) => (
+            <tr key={e.PlayerID} className="border-b border-zinc-800/50 last:border-0">
+              <td className="py-2.5 text-zinc-200" style={mono}>{shortId(e.PlayerID)}</td>
+              <td className="py-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-zinc-300 tabular-nums w-12" style={mono}>{e.Elo}</span>
+                  <div className="w-28 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-violet-500 rounded-full"
+                      style={{ width: `${(e.Elo / maxElo) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              </td>
+              <td className="py-2.5 text-right text-zinc-400 tabular-nums" style={mono}>
+                {e.Wins}/{e.Losses}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
