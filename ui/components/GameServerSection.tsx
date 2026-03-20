@@ -59,7 +59,7 @@ export function GameServerSection({ serverUrl, label }: Props) {
       <div className="flex items-center gap-3 mb-3 border-b border-zinc-800 pb-2">
         <span className="text-sm font-bold text-zinc-300 tracking-widest" style={{ fontFamily: "var(--font-geist-mono)" }}>{label}</span>
         {isDegraded ? <DegradedBadge /> : <OnlineBadge />}
-        <span className="ml-auto text-xs text-zinc-500">
+        <span className="ml-auto text-xs text-zinc-400">
           {sessionCount} session{sessionCount !== 1 ? "s" : ""} active
         </span>
       </div>

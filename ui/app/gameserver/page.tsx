@@ -18,7 +18,7 @@ function serverLabel(url: string, index: number): string {
 
 export default function GameServerPage() {
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="max-w-7xl mx-auto px-6">
       {SERVERS.map((url, i) => (
         <GameServerSection
           key={url}

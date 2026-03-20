@@ -2,6 +2,7 @@
 
 import { QueuedPlayer } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 const mono = { fontFamily: "var(--font-geist-mono)" };
 const geist = { fontFamily: "var(--font-geist)" };
@@ -28,14 +29,14 @@ interface Props {
 
 export function PlayerQueue({ queue }: Props) {
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded py-2 px-3">
+    <div className="bg-zinc-900/20 border border-zinc-800 rounded backdrop-blur-sm py-2 px-3 h-[250px] overflow-y-auto">
       <div className="mb-3">
         <div className="text-sm font-semibold text-zinc-200" style={geist}>Player Queue</div>
-        <div className="text-xs text-zinc-500" style={geist}>Bots awaiting match</div>
+        <div className="text-xs text-zinc-400" style={geist}>Bots awaiting match</div>
       </div>
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-[10px] tracking-widest text-zinc-500 uppercase border-b border-zinc-800" style={mono}>
+          <tr className="text-[10px] tracking-widest text-zinc-400 uppercase border-b border-zinc-800" style={mono}>
             <th className="text-left pb-2 font-medium">Bot</th>
             <th className="text-left pb-2 font-medium">ELO</th>
             <th className="text-left pb-2 font-medium">Wait</th>
@@ -71,9 +72,7 @@ export function PlayerQueue({ queue }: Props) {
                 </div>
               </td>
               <td className="py-2.5 text-right">
-                <span style={mono} className="px-2 py-0.5 text-[10px] font-bold text-violet-400 border border-violet-700 rounded cursor-default">
-                  + MATCH
-                </span>
+                <Button size="sm" variant="outline" style={mono}>Match</Button>
               </td>
             </tr>
           ))}

@@ -56,10 +56,10 @@ export function GameCard({ session, serverUrl, elapsedSeconds }: Props) {
   }, [serverUrl, session.session_id]);
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded p-3 flex flex-col gap-2 min-w-[240px]">
+    <div className="bg-zinc-900/20 border border-zinc-800 rounded backdrop-blur-sm p-3 flex flex-col gap-2 min-w-[240px]">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <span className="text-xs text-zinc-500" style={{ fontFamily: "var(--font-geist-mono)" }}>{shortId(session.session_id)}</span>
+        <span className="text-xs text-zinc-400" style={{ fontFamily: "var(--font-geist-mono)" }}>{shortId(session.session_id)}</span>
         <GameBadge game={session.game} />
       </div>
 
@@ -78,7 +78,7 @@ export function GameCard({ session, serverUrl, elapsedSeconds }: Props) {
 
       {/* Footer */}
       <div className="flex items-center justify-between border-t border-zinc-800 pt-2">
-        <span className="text-xs text-zinc-500 tabular-nums" style={{ fontFamily: "var(--font-geist-mono)" }}>
+        <span className="text-xs text-zinc-400 tabular-nums" style={{ fontFamily: "var(--font-geist-mono)" }}>
           ⏱ {fmtTime(elapsedSeconds)} · Turn {turnCount(gameState, session.game)}
         </span>
         <span className="px-2 py-0.5 text-[10px] font-bold text-red-400 border border-red-800 rounded cursor-default" style={{ fontFamily: "var(--font-geist-mono)" }}>

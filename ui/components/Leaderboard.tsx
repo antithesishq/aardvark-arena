@@ -17,22 +17,29 @@ export function Leaderboard({ entries }: Props) {
   const maxElo = Math.max(...entries.map((e) => e.Elo), 1000);
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded py-2 px-3">
+    <div className="bg-zinc-900/20 border border-zinc-800 rounded backdrop-blur-sm py-2 px-3 h-[250px] overflow-y-auto">
       <div className="flex items-start justify-between mb-3">
         <div>
           <div className="text-sm font-semibold text-zinc-200" style={geist}>ELO Leaderboard</div>
-          <div className="text-xs text-zinc-500" style={geist}>All-time rankings</div>
+          <div className="text-xs text-zinc-400" style={geist}>All-time rankings</div>
         </div>
       </div>
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-[10px] tracking-widest text-zinc-500 uppercase border-b border-zinc-800" style={mono}>
+          <tr className="text-[10px] tracking-widest text-zinc-400 uppercase border-b border-zinc-800" style={mono}>
             <th className="text-left pb-2 font-medium">Bot</th>
             <th className="text-left pb-2 font-medium">ELO</th>
             <th className="text-right pb-2 font-medium">W/L</th>
           </tr>
         </thead>
         <tbody>
+          {entries.length === 0 && (
+            <tr>
+              <td colSpan={3} className="py-4 text-center text-zinc-600 text-xs" style={geist}>
+                No players yet
+              </td>
+            </tr>
+          )}
           {entries.map((e) => (
             <tr key={e.PlayerID} className="border-b border-zinc-800/50 last:border-0">
               <td className="py-2.5 text-zinc-200" style={mono}>{shortId(e.PlayerID)}</td>

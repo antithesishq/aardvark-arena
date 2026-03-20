@@ -2,6 +2,7 @@
 
 import { ActiveSession } from "@/lib/api";
 import { GameBadgeShort } from "./badges";
+import { Button } from "@/components/ui/button";
 
 const mono = { fontFamily: "var(--font-geist-mono)" };
 const geist = { fontFamily: "var(--font-geist)" };
@@ -32,16 +33,16 @@ interface Props {
 
 export function ActiveSessions({ sessions }: Props) {
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded py-2 px-3">
+    <div className="bg-zinc-900/20 border border-zinc-800 rounded backdrop-blur-sm py-2 px-3 h-[350px] overflow-y-auto">
       <div className="flex items-start justify-between mb-3">
         <div>
           <div className="text-sm font-semibold text-zinc-200" style={geist}>Active Sessions</div>
-          <div className="text-xs text-zinc-500" style={geist}>In-progress game sessions</div>
+          <div className="text-xs text-zinc-400" style={geist}>In-progress game sessions</div>
         </div>
       </div>
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-[10px] tracking-widest text-zinc-500 uppercase border-b border-zinc-800" style={mono}>
+          <tr className="text-[10px] tracking-widest text-zinc-400 uppercase border-b border-zinc-800" style={mono}>
             <th className="text-left pb-2 font-medium">Session</th>
             <th className="text-left pb-2 font-medium">Players</th>
             <th className="text-left pb-2 font-medium">Game</th>
@@ -68,9 +69,7 @@ export function ActiveSessions({ sessions }: Props) {
               <td className="py-2.5 text-zinc-400 text-xs" style={mono}>{serverLabel(s.server)}</td>
               <td className="py-2.5 text-xs text-zinc-300 tabular-nums" style={mono}>{fmtElapsed(s.created_at)}</td>
               <td className="py-2.5 text-right">
-                <span style={mono} className="px-2 py-0.5 text-[10px] font-bold text-red-400 border border-red-800 rounded cursor-default">
-                  × CANCEL
-                </span>
+                <Button size="sm" variant="destructive" style={mono}>Cancel</Button>
               </td>
             </tr>
           ))}
