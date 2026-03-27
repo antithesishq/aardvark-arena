@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"time"
 
 	"github.com/antithesishq/aardvark-arena/internal"
 	"github.com/antithesishq/aardvark-arena/internal/game"
@@ -20,11 +21,12 @@ type Completion struct {
 
 // Protocol handles the player-side game communication protocol.
 type Protocol[Move any, Shared any] struct {
-	rx       <-chan gameserver.PlayerMsg
-	tx       chan<- json.RawMessage
-	ai       game.Ai[Move, Shared]
-	behavior Behavior
-	rng      *rand.Rand
+	rx        <-chan gameserver.PlayerMsg
+	tx        chan<- json.RawMessage
+	ai        game.Ai[Move, Shared]
+	behavior  Behavior
+	rng       *rand.Rand
+	moveDelay time.Duration
 }
 
 // NewProtocol creates a Protocol that communicates over the given channels.
@@ -33,13 +35,15 @@ func NewProtocol[M any, S any](
 	tx chan<- json.RawMessage,
 	ai game.Ai[M, S],
 	behavior Behavior,
+	moveDelay time.Duration,
 ) *Protocol[M, S] {
 	return &Protocol[M, S]{
-		rx:       rx,
-		tx:       tx,
-		ai:       ai,
-		behavior: behavior,
-		rng:      internal.NewRand(),
+		rx:        rx,
+		tx:        tx,
+		ai:        ai,
+		behavior:  behavior,
+		rng:       internal.NewRand(),
+		moveDelay: moveDelay,
 	}
 }
 
@@ -94,6 +98,9 @@ func (p *Protocol[M, S]) RunToCompletion() (Completion, error) {
 }
 
 func (p *Protocol[M, S]) makeMove(player game.Player, shared S, forceChaos bool) error {
+	if p.moveDelay > 0 {
+		time.Sleep(p.moveDelay)
+	}
 	move, err := p.ai.GetMove(player, shared)
 	if err != nil {
 		return fmt.Errorf("ai failed: %w", err)
