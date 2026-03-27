@@ -15,6 +15,7 @@ import (
 	"github.com/antithesishq/aardvark-arena/internal/game"
 	"github.com/antithesishq/antithesis-sdk-go/assert"
 	"github.com/coder/websocket"
+	"github.com/coder/websocket/wsjson"
 )
 
 // Config holds server configuration.
@@ -49,13 +50,16 @@ func New(ctx context.Context, cfg Config) *Server {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.mux.ServeHTTP(w, r)
+	internal.CORS(s.mux).ServeHTTP(w, r)
 }
 
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET /health", s.handleHealth)
 	s.mux.HandleFunc("PUT /session/{sid}", internal.TokenAuth(s.cfg.Token, s.handleCreateSession))
 	s.mux.HandleFunc("/session/{sid}/{pid}", s.handleSessionConnect)
+	s.mux.HandleFunc("GET /sessions", s.handleListSessions)
+	s.mux.HandleFunc("GET /session/{sid}/watch", s.handleWatchSession)
+	s.mux.HandleFunc("DELETE /session/{sid}", s.handleCancelSession)
 }
 
 // HealthResponse contains the server health status.
@@ -146,4 +150,50 @@ func (s *Server) handleSessionConnect(w http.ResponseWriter, r *http.Request) {
 		_ = conn.Close(websocket.StatusInternalError, fmt.Sprintf("failed to join session: %v", err))
 		return
 	}
+}
+
+func (s *Server) handleListSessions(w http.ResponseWriter, _ *http.Request) {
+	if err := internal.RespondJSON(w, s.sessions.ListSessions()); err != nil {
+		internal.WriteError(w, http.StatusInternalServerError, err)
+	}
+}
+
+func (s *Server) handleWatchSession(w http.ResponseWriter, r *http.Request) {
+	sid, err := internal.PathUUID(r, "sid")
+	if err != nil {
+		internal.WriteError(w, http.StatusBadRequest, err)
+		return
+	}
+	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+		InsecureSkipVerify: true,
+	})
+	if err != nil {
+		log.Printf("spectator websocket upgrade failed: %v", err)
+		return
+	}
+	ch, err := s.sessions.WatchSession(sid)
+	if err != nil {
+		_ = conn.Close(websocket.StatusNormalClosure, err.Error())
+		return
+	}
+	for msg := range ch {
+		if err := wsjson.Write(context.Background(), conn, msg); err != nil {
+			_ = conn.Close(websocket.StatusInternalError, "write failed")
+			return
+		}
+	}
+	_ = conn.Close(websocket.StatusNormalClosure, "session ended")
+}
+
+func (s *Server) handleCancelSession(w http.ResponseWriter, r *http.Request) {
+	sid, err := internal.PathUUID(r, "sid")
+	if err != nil {
+		internal.WriteError(w, http.StatusBadRequest, err)
+		return
+	}
+	if err := s.sessions.CancelSession(sid); err != nil {
+		internal.WriteError(w, http.StatusNotFound, err)
+		return
+	}
+	_, _ = w.Write([]byte("ok"))
 }

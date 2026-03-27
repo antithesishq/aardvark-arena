@@ -145,7 +145,7 @@ func (h *sessionHandle) RunToCompletion(g game.Kind, deadline time.Time, turnTim
 			game.NewState(game.NewTicTacToeBoard()),
 			&game.TicTacToeSession{},
 		)
-		protocol.RunToCompletion()
+		protocol.RunToCompletion(h.ctx.Done())
 	case game.Connect4:
 		protocol := NewProtocol(
 			h.inbox,
@@ -156,7 +156,7 @@ func (h *sessionHandle) RunToCompletion(g game.Kind, deadline time.Time, turnTim
 			game.NewState(game.NewConnect4Board()),
 			&game.Connect4Session{},
 		)
-		protocol.RunToCompletion()
+		protocol.RunToCompletion(h.ctx.Done())
 	case game.Battleship:
 		protocol := NewProtocol(
 			h.inbox,
@@ -167,7 +167,7 @@ func (h *sessionHandle) RunToCompletion(g game.Kind, deadline time.Time, turnTim
 			game.NewState(game.NewBattleshipSharedState()),
 			&game.BattleshipSession{},
 		)
-		protocol.RunToCompletion()
+		protocol.RunToCompletion(h.ctx.Done())
 	default:
 		assert.Unreachable(
 			"session manager should only run supported game kinds",
@@ -214,4 +214,55 @@ func (h *sessionHandle) Join(pid internal.PlayerID, conn *websocket.Conn) {
 			}
 		}
 	}()
+}
+
+// CancelSession cancels a session by its ID.
+func (s *SessionManager) CancelSession(sid internal.SessionID) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	handle, ok := s.sessions[sid]
+	if !ok || handle.IsFinished() {
+		return fmt.Errorf("session %s not found or already finished", sid)
+	}
+	handle.cancel()
+	return nil
+}
+
+// SessionSummary is a brief view of an active session.
+type SessionSummary struct {
+	SessionID internal.SessionID `json:"session_id"`
+	Game      game.Kind          `json:"game"`
+}
+
+// ListSessions returns all currently active (unfinished) sessions.
+func (s *SessionManager) ListSessions() []SessionSummary {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	result := make([]SessionSummary, 0, len(s.sessions))
+	for sid, handle := range s.sessions {
+		if !handle.IsFinished() {
+			result = append(result, SessionSummary{
+				SessionID: sid,
+				Game:      handle.game,
+			})
+		}
+	}
+	return result
+}
+
+// WatchSession registers a spectator channel on the given session.
+func (s *SessionManager) WatchSession(sid internal.SessionID) (chan PlayerMsg, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	handle, ok := s.sessions[sid]
+	if !ok || handle.IsFinished() {
+		return nil, fmt.Errorf("session %s not found or already finished", sid)
+	}
+	ch := make(chan PlayerMsg, 1)
+	select {
+	case handle.inbox <- inboxMsg{spectatorCh: ch}:
+	case <-handle.ctx.Done():
+		return nil, fmt.Errorf("session %s ended before spectator could join", sid)
+	}
+	return ch, nil
 }

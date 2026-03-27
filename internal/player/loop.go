@@ -33,6 +33,9 @@ type Config struct {
 	// NumSessions is the number of games this player should play before exiting.
 	// If 0 the player will play games until interrupted.
 	NumSessions int
+
+	// MoveDelay adds an artificial pause before each move, useful for demos.
+	MoveDelay time.Duration
 }
 
 // Loop runs the player game loop.
@@ -154,15 +157,15 @@ func (l *Loop) playGame(ctx context.Context, info *matchmaker.SessionInfo) error
 	switch info.Game {
 	case game.TicTacToe:
 		assert.Reachable("players sometimes play tic-tac-toe sessions", nil)
-		p := NewProtocol(session.protocolRx, session.protocolTx, game.NewTicTacToeAi(), l.cfg.Behavior)
+		p := NewProtocol(session.protocolRx, session.protocolTx, game.NewTicTacToeAi(), l.cfg.Behavior, l.cfg.MoveDelay)
 		completion, err = p.RunToCompletion()
 	case game.Connect4:
 		assert.Reachable("players sometimes play connect4 sessions", nil)
-		p := NewProtocol(session.protocolRx, session.protocolTx, game.NewConnect4Ai(), l.cfg.Behavior)
+		p := NewProtocol(session.protocolRx, session.protocolTx, game.NewConnect4Ai(), l.cfg.Behavior, l.cfg.MoveDelay)
 		completion, err = p.RunToCompletion()
 	case game.Battleship:
 		assert.Reachable("players sometimes play battleship sessions", nil)
-		p := NewProtocol(session.protocolRx, session.protocolTx, game.NewBattleshipAi(), l.cfg.Behavior)
+		p := NewProtocol(session.protocolRx, session.protocolTx, game.NewBattleshipAi(), l.cfg.Behavior, l.cfg.MoveDelay)
 		completion, err = p.RunToCompletion()
 	default:
 		return fmt.Errorf("unsupported game: %s", info.Game)

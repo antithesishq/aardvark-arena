@@ -340,3 +340,78 @@ func (db *DB) ReportSessionResult(
 	}
 	return tx.Commit()
 }
+
+const selectSessionByID = `
+	SELECT session_id, server, game, created_at, deadline, completed_at, cancelled, winner_id
+	FROM sessions WHERE session_id = ?
+`
+
+// GetSession returns the session with the given ID, or sql.ErrNoRows if not found.
+func (db *DB) GetSession(sid internal.SessionID) (*SessionModel, error) {
+	var s SessionModel
+	return &s, db.db.Get(&s, selectSessionByID, sid)
+}
+
+const selectActiveSessions = `
+	SELECT s.session_id, s.server, s.game, s.created_at, s.deadline
+	FROM sessions s
+	WHERE s.completed_at IS NULL
+	ORDER BY s.created_at DESC
+`
+
+const selectSessionPlayerIDs = `
+	SELECT player_id FROM player_session WHERE session_id = ?
+`
+
+const selectLeaderboard = `
+	SELECT player_id, elo, wins, losses, draws
+	FROM players
+	ORDER BY elo DESC
+	LIMIT 20
+`
+
+// ActiveSessionView is a session with its player IDs for the status endpoint.
+type ActiveSessionView struct {
+	SessionID internal.SessionID  `db:"session_id" json:"session_id"`
+	Server    string              `json:"server"`
+	Game      string              `json:"game"`
+	CreatedAt time.Time           `db:"created_at" json:"created_at"`
+	Deadline  time.Time           `json:"deadline"`
+	PlayerIDs []internal.PlayerID `json:"player_ids"`
+}
+
+// ActiveSessions returns all sessions that have not yet completed.
+func (db *DB) ActiveSessions() ([]ActiveSessionView, error) {
+	var rows []struct {
+		SessionID internal.SessionID `db:"session_id"`
+		Server    string
+		Game      string
+		CreatedAt time.Time `db:"created_at"`
+		Deadline  time.Time
+	}
+	if err := db.db.Select(&rows, selectActiveSessions); err != nil {
+		return nil, err
+	}
+	result := make([]ActiveSessionView, 0, len(rows))
+	for _, r := range rows {
+		var pids []internal.PlayerID
+		if err := db.db.Select(&pids, selectSessionPlayerIDs, r.SessionID); err != nil {
+			return nil, err
+		}
+		result = append(result, ActiveSessionView{
+			SessionID: r.SessionID,
+			Server:    r.Server,
+			Game:      r.Game,
+			CreatedAt: r.CreatedAt,
+			Deadline:  r.Deadline,
+			PlayerIDs: pids,
+		})
+	}
+	return result, nil
+}
+
+// Leaderboard returns all players ordered by ELO descending.
+func (db *DB) Leaderboard() ([]PlayerModel, error) {
+	var players []PlayerModel
+	return players, db.db.Select(&players, selectLeaderboard)
+}

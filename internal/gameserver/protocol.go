@@ -23,8 +23,9 @@ type inboxMsg struct {
 	pid internal.PlayerID
 
 	// one of move or conn must be nil
-	move json.RawMessage
-	conn chan PlayerMsg
+	move        json.RawMessage
+	conn        chan PlayerMsg
+	spectatorCh chan PlayerMsg
 }
 
 type playerConn struct {
@@ -49,6 +50,7 @@ type Protocol[Move any, Shared any] struct {
 	turnTimeout time.Duration
 	turnTimer   *time.Timer
 	players     map[internal.PlayerID]playerConn
+	spectators  []chan PlayerMsg
 	state       game.State[Shared]
 	session     game.Session[Move, Shared]
 }
@@ -70,10 +72,11 @@ func NewProtocol[M any, S any](
 		deadline:    deadline,
 		turnTimeout: turnTimeout,
 		// double the initial turnTimeout as a connection grace period
-		turnTimer: time.NewTimer(turnTimeout * 2),
-		players:   make(map[internal.PlayerID]playerConn),
-		state:     state,
-		session:   session,
+		turnTimer:  time.NewTimer(turnTimeout * 2),
+		players:    make(map[internal.PlayerID]playerConn),
+		spectators: nil,
+		state:      state,
+		session:    session,
 	}
 }
 
@@ -104,14 +107,17 @@ func (p *Protocol[M, S]) report(status game.Status) {
 	}
 }
 
-// RunToCompletion runs the game session until it ends or the deadline is reached.
-func (p *Protocol[M, S]) RunToCompletion() {
+// RunToCompletion runs the game session until it ends, the deadline is reached, or done is closed.
+func (p *Protocol[M, S]) RunToCompletion(done <-chan struct{}) {
 	timer := time.NewTimer(time.Until(p.deadline))
 	defer timer.Stop()
 
 outer:
 	for {
 		select {
+		case <-done:
+			p.report(game.Cancelled)
+			break outer
 		case <-timer.C:
 			p.report(game.Cancelled)
 			break outer
@@ -126,6 +132,14 @@ outer:
 		case msg, ok := <-p.inbox:
 			if !ok {
 				break outer
+			}
+			if msg.spectatorCh != nil {
+				p.spectators = append(p.spectators, msg.spectatorCh)
+				encoded, err := json.Marshal(p.state)
+				if err == nil {
+					sendLatest(msg.spectatorCh, PlayerMsg{State: encoded})
+				}
+				continue
 			}
 			if msg.conn != nil && msg.move != nil {
 				log.Fatal("BUG: both move and conn are set")
@@ -144,6 +158,9 @@ outer:
 	// close player conns before finishing the protocol
 	for _, pc := range p.players {
 		close(pc.conn)
+	}
+	for _, ch := range p.spectators {
+		close(ch)
 	}
 }
 
@@ -219,6 +236,13 @@ func (p *Protocol[M, S]) handleMove(pid internal.PlayerID, rawMove json.RawMessa
 func (p *Protocol[M, S]) BroadcastState() {
 	for pid := range p.players {
 		p.SendState(pid)
+	}
+	encoded, err := json.Marshal(p.state)
+	if err != nil {
+		return
+	}
+	for _, ch := range p.spectators {
+		sendLatest(ch, PlayerMsg{State: encoded})
 	}
 }
 
