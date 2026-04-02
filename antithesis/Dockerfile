@@ -40,6 +40,3 @@ FROM runtime-base AS health-checker
 COPY antithesis/health-checker.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
-
-FROM scratch AS config
-COPY antithesis/docker-compose.yaml /docker-compose.yaml
