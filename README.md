@@ -1,6 +1,6 @@
 # Aardvark Arena
 
-A turn-based game simulation that pitches AI players against each other in simple 2D games. Built as a reference project for testing with [Antithesis](https://antithesis.com) and [Bombadil](https://antithesis.com/docs/bombadil/).
+A turn-based game simulation that pitches AI players against each other in simple 2D games. Built as a reference project for testing with [Antithesis](https://antithesis.com) and [Bombadil](https://github.com/antithesishq/bombadil).
 
 Aardvark Arena runs three types of games -- **Tic-Tac-Toe**, **Connect4**, and **Battleship** -- across a distributed system of services:
 
@@ -55,7 +55,7 @@ The `antithesis/` directory contains everything needed to run Aardvark Arena on 
 
 **Workloads** -- two player types drive traffic during a test run: a normal player that queues, plays, and re-queues, and an evil player that queues but never joins. Driver scripts in `antithesis/test/` run these in parallel to exercise the system under realistic and adversarial conditions.
 
-**Bombadil** -- the UI is tested with [Bombadil](https://antithesis.com/docs/bombadil/), which explores frontend paths automatically. Properties defined in `ui/bombadil-spec.ts` assert things like nav state matching the current URL and active session counts staying consistent.
+**Bombadil** -- the UI is tested with [Bombadil](https://github.com/antithesishq/bombadil), which explores frontend paths automatically. Properties defined in `ui/bombadil-spec.ts` assert things like nav state matching the current URL and active session counts staying consistent.
 
 ## Project structure
 
