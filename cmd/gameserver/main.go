@@ -13,6 +13,8 @@ import (
 
 	"github.com/antithesishq/aardvark-arena/internal"
 	"github.com/antithesishq/aardvark-arena/internal/gameserver"
+
+	"github.com/antithesishq/antithesis-sdk-go/assert"
 )
 
 func main() {
@@ -50,6 +52,8 @@ func main() {
 			log.Printf("shutdown error: %v", err)
 		}
 	}()
+
+	assert.Reachable("gameserver startup path executed", nil)
 
 	log.Printf("listening on %s", *addr)
 	if err := httpServer.ListenAndServe(); err != http.ErrServerClosed {

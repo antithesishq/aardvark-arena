@@ -7,6 +7,15 @@ require github.com/google/uuid v1.6.0
 require github.com/coder/websocket v1.8.14
 
 require (
+	github.com/antithesishq/antithesis-sdk-go v0.7.0
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/mattn/go-sqlite3 v1.14.33
 )
+
+require (
+	golang.org/x/mod v0.33.0 // indirect
+	golang.org/x/sync v0.19.0 // indirect
+	golang.org/x/tools v0.42.0 // indirect
+)
+
+tool github.com/antithesishq/antithesis-sdk-go/tools/antithesis-go-instrumentor

@@ -1,0 +1,58 @@
+name: aardvark-arena
+
+services:
+  matchmaker:
+    container_name: aardvark-arena-matchmaker
+    hostname: aardvark-arena-matchmaker
+    platform: linux/amd64
+    build:
+      context: ../..
+      dockerfile: antithesis/Dockerfile
+      target: matchmaker
+    image: aardvark-arena-matchmaker:latest
+    environment:
+      NO_COLOR: "1"
+    command:
+      - "-addr=:8080"
+      - "-gameserver=http://aardvark-arena-gameserver:8081"
+      - "-db-path=/data/matchmaker.db"
+      - "-match-interval=100ms"
+      - "-session-timeout=2m"
+      - "-monitor-interval=1s"
+
+  gameserver:
+    container_name: aardvark-arena-gameserver
+    hostname: aardvark-arena-gameserver
+    platform: linux/amd64
+    build:
+      context: ../..
+      dockerfile: antithesis/Dockerfile
+      target: gameserver
+    image: aardvark-arena-gameserver:latest
+    environment:
+      NO_COLOR: "1"
+    command:
+      - "-addr=:8081"
+      - "-matchmaker=http://aardvark-arena-matchmaker:8080"
+      - "-turn-timeout=10s"
+      - "-max-sessions=6"
+
+  workload-1:
+    container_name: aardvark-arena-workload-1
+    hostname: aardvark-arena-workload-1
+    platform: linux/amd64
+    build:
+      context: ../..
+      dockerfile: antithesis/Dockerfile
+      target: workload
+    image: aardvark-arena-workload:latest
+    environment:
+      NO_COLOR: "1"
+
+  workload-2:
+    container_name: aardvark-arena-workload-2
+    hostname: aardvark-arena-workload-2
+    platform: linux/amd64
+    image: aardvark-arena-workload:latest
+    environment:
+      NO_COLOR: "1"

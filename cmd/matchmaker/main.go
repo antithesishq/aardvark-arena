@@ -13,6 +13,9 @@ import (
 
 	"github.com/antithesishq/aardvark-arena/internal"
 	"github.com/antithesishq/aardvark-arena/internal/matchmaker"
+
+	"github.com/antithesishq/antithesis-sdk-go/assert"
+	"github.com/antithesishq/antithesis-sdk-go/lifecycle"
 )
 
 var DefaultSessionTimeout = 5 * time.Minute
@@ -67,6 +70,9 @@ func main() {
 			log.Printf("shutdown error: %v", err)
 		}
 	}()
+
+	assert.Reachable("matchmaker startup path executed", nil)
+	lifecycle.SetupComplete(map[string]any{"service": "matchmaker"})
 
 	log.Printf("listening on %s", *addr)
 	if err := httpServer.ListenAndServe(); err != http.ErrServerClosed {
