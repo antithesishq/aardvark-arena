@@ -26,7 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <header className="sticky top-0 z-50 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur-sm">
           <div className="max-w-7xl mx-auto flex items-center gap-8 h-12 px-6">
             <Link href="/" className="shrink-0">
-              <Image src="/logo.avif" alt="Aardvark Arena" height={70} width={70} priority />
+              <Image src="/logo.avif" alt="Aardvark Arena" height={70} width={70} className="h-8 w-auto" priority />
             </Link>
             <NavTabs />
           </div>

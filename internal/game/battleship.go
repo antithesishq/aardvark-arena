@@ -317,13 +317,27 @@ func (ai *BattleshipAi) getAttackMove(player Player, state BattleshipSharedState
 		return BattleshipMove{Kind: AttackMoveKind, Target: target}, nil
 	}
 
-	// Fall back to random targeting
+	// Fall back to random targeting using checkerboard parity.
+	// Every ship is at least 2 cells long, so it must cover at least one
+	// cell of each parity — targeting only one parity halves the search space.
 	var targets []Position
 	for x := range battleshipBounds.Width {
 		for y := range battleshipBounds.Height {
 			pos := Position{X: x, Y: y}
-			if _, exists := opponentBoard[pos]; !exists {
+			if _, exists := opponentBoard[pos]; !exists && (x+y)%2 == 0 {
 				targets = append(targets, pos)
+			}
+		}
+	}
+
+	// If all checkerboard cells are exhausted, fall back to any remaining cell.
+	if len(targets) == 0 {
+		for x := range battleshipBounds.Width {
+			for y := range battleshipBounds.Height {
+				pos := Position{X: x, Y: y}
+				if _, exists := opponentBoard[pos]; !exists {
+					targets = append(targets, pos)
+				}
 			}
 		}
 	}

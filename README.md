@@ -23,28 +23,25 @@ Clone the repo, start the services, and watch AI bots battle it out in Tic-Tac-T
 
 ```bash
 # Terminal 1: start the matchmaker
-go run ./cmd/matchmaker -addr=:8080 -token=secret \
+go run ./cmd/matchmaker -addr=:8080 -token=a1b2c3d4-e5f6-7890-abcd-ef1234567890 \
   -gameserver=http://localhost:8081
 
 # Terminal 2: start a game server
-go run ./cmd/gameserver -addr=:8081 -token=secret \
+go run ./cmd/gameserver -addr=:8081 -token=a1b2c3d4-e5f6-7890-abcd-ef1234567890 \
   -matchmaker=http://localhost:8080
 
 # Terminal 3: start the UI
 cd ui && npm install && npm run dev
 ```
 
-Open http://localhost:3000 to see the dashboard. Nothing is happening yet because there are no players. Spin up a couple of bots and watch them start queuing, matching, and playing:
+Open http://localhost:3000 to see the dashboard. Nothing is happening yet because there are no players. Use the `swarm` command to spin up a batch of AI players:
 
 ```bash
-# Terminal 4: launch a player
-go run ./cmd/player -matchmaker=http://localhost:8080
-
-# Terminal 5: launch another player
-go run ./cmd/player -matchmaker=http://localhost:8080
+# Terminal 4: launch players
+go run ./cmd/swarm -n 7 -move-delay 500ms
 ```
 
-Games should start appearing in the UI within a few seconds. Add more players to increase the action.
+Games should start appearing in the UI within a few seconds. You can also run `go run ./cmd/player` to launch a single player if you prefer.
 
 
 ## Testing with Antithesis
@@ -64,6 +61,7 @@ cmd/
   matchmaker/       # Matchmaker service entrypoint
   gameserver/       # Game server service entrypoint
   player/           # AI player entrypoint
+  swarm/            # Multi-player launcher for local testing
 internal/
   matchmaker/       # Matchmaker logic, ELO, DB, HTTP handlers
   gameserver/       # Game server logic, session management, WebSocket protocol

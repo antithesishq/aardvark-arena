@@ -76,6 +76,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /status", s.handleStatus)
 	s.mux.HandleFunc("GET /leaderboard", s.handleLeaderboard)
 	s.mux.HandleFunc("DELETE /session/{sid}", s.handleCancelSession)
+	s.mux.HandleFunc("GET /servers", s.handleServers)
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
@@ -225,6 +226,14 @@ func (s *Server) handleCancelSession(w http.ResponseWriter, r *http.Request) {
 	}
 	s.queue.Untrack(sid)
 	_, _ = w.Write([]byte("ok"))
+}
+
+func (s *Server) handleServers(w http.ResponseWriter, _ *http.Request) {
+	urls := make([]string, len(s.cfg.GameServers))
+	for i, u := range s.cfg.GameServers {
+		urls[i] = u.String()
+	}
+	_ = internal.RespondJSON(w, urls)
 }
 
 func (s *Server) handleLeaderboard(w http.ResponseWriter, _ *http.Request) {

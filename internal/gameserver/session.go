@@ -24,9 +24,6 @@ func (e ErrMaxSessions) Error() string {
 	return "max session reached"
 }
 
-// https://stackoverflow.com/questions/25065055/what-is-the-maximum-time-time-in-go
-var maxTime = time.Unix(0, 0).Add(1<<63 - 1)
-
 // SessionManager manages active game sessions.
 type SessionManager struct {
 	// mu protects reads/writes to the sessions map
@@ -34,14 +31,21 @@ type SessionManager struct {
 	sessions map[internal.SessionID]sessionHandle
 	resultCh chan resultMsg
 	cfg      Config
+
+	// watchMu protects watchers and lastEvents. Lock ordering: mu before watchMu.
+	watchMu    sync.Mutex
+	watchers   map[chan WatchEvent]struct{}
+	lastEvents map[internal.SessionID]*WatchEvent
 }
 
 // NewSessionManager creates a new SessionManager with the given config.
 func NewSessionManager(cfg Config, resultCh chan resultMsg) *SessionManager {
 	return &SessionManager{
-		sessions: make(map[internal.SessionID]sessionHandle),
-		resultCh: resultCh,
-		cfg:      cfg,
+		sessions:   make(map[internal.SessionID]sessionHandle),
+		resultCh:   resultCh,
+		cfg:        cfg,
+		watchers:   make(map[chan WatchEvent]struct{}),
+		lastEvents: make(map[internal.SessionID]*WatchEvent),
 	}
 }
 
@@ -64,12 +68,16 @@ func (s *SessionManager) CreateSession(sid internal.SessionID, game game.Kind, d
 				"session creation sometimes fails because the server is full",
 				map[string]any{"active_sessions": len(s.sessions), "max": s.cfg.MaxSessions},
 			)
-			// find min deadline
-			var minDeadline = maxTime
+			// find min deadline among active sessions
+			var minDeadline time.Time
 			for _, session := range s.sessions {
-				if !session.IsFinished() && session.deadline.Before(minDeadline) {
+				if !session.IsFinished() && (minDeadline.IsZero() || session.deadline.Before(minDeadline)) {
 					minDeadline = session.deadline
 				}
+			}
+			if minDeadline.IsZero() {
+				// No active sessions found — retry soon
+				minDeadline = time.Now().Add(5 * time.Second)
 			}
 			return &ErrMaxSessions{RetryAt: minDeadline}
 		}
@@ -83,10 +91,44 @@ func (s *SessionManager) CreateSession(sid internal.SessionID, game game.Kind, d
 			deadline: deadline,
 			inbox:    inboxCh,
 			result:   s.resultCh,
+			cleanup: func() {
+				s.mu.Lock()
+				delete(s.sessions, sid)
+				s.mu.Unlock()
+				log.Printf("session %s removed", sid)
+
+				s.watchMu.Lock()
+				delete(s.lastEvents, sid)
+				s.fanoutWatch(WatchEvent{Type: WatchEventSessionEnd, SessionID: sid})
+				s.watchMu.Unlock()
+
+				s.broadcastHealth()
+			},
+			onWatch: func(players map[string]int, state json.RawMessage) {
+				evt := WatchEvent{
+					Type:      WatchEventSession,
+					SessionID: sid,
+					Game:      game,
+					Players:   players,
+					State:     state,
+					Deadline:  &deadline,
+				}
+				s.watchMu.Lock()
+				s.lastEvents[sid] = &evt
+				s.fanoutWatch(evt)
+				s.watchMu.Unlock()
+			},
 		}
 		go handle.RunToCompletion(game, deadline, s.cfg.TurnTimeout)
 		s.sessions[sid] = handle
 		log.Printf("session %s created", sid)
+
+		// Broadcast health inline — mu is already held, so we can't call
+		// broadcastHealth() which would re-acquire it.
+		evt := s.healthEvent()
+		s.watchMu.Lock()
+		s.fanoutWatch(evt)
+		s.watchMu.Unlock()
 	}
 
 	handle := s.sessions[sid]
@@ -124,6 +166,8 @@ type sessionHandle struct {
 	deadline time.Time
 	inbox    chan inboxMsg
 	result   chan resultMsg
+	cleanup  func()
+	onWatch  func(players map[string]int, state json.RawMessage)
 }
 
 func (h *sessionHandle) IsFinished() bool {
@@ -133,6 +177,7 @@ func (h *sessionHandle) IsFinished() bool {
 // Starts a goroutine.
 func (h *sessionHandle) RunToCompletion(g game.Kind, deadline time.Time, turnTimeout time.Duration) {
 	defer h.cancel()
+	defer h.cleanup()
 
 	switch g {
 	case game.TicTacToe:
@@ -144,6 +189,7 @@ func (h *sessionHandle) RunToCompletion(g game.Kind, deadline time.Time, turnTim
 			turnTimeout,
 			game.NewState(game.NewTicTacToeBoard()),
 			&game.TicTacToeSession{},
+			h.onWatch,
 		)
 		protocol.RunToCompletion(h.ctx.Done())
 	case game.Connect4:
@@ -155,6 +201,7 @@ func (h *sessionHandle) RunToCompletion(g game.Kind, deadline time.Time, turnTim
 			turnTimeout,
 			game.NewState(game.NewConnect4Board()),
 			&game.Connect4Session{},
+			h.onWatch,
 		)
 		protocol.RunToCompletion(h.ctx.Done())
 	case game.Battleship:
@@ -166,6 +213,7 @@ func (h *sessionHandle) RunToCompletion(g game.Kind, deadline time.Time, turnTim
 			turnTimeout,
 			game.NewState(game.NewBattleshipSharedState()),
 			&game.BattleshipSession{},
+			h.onWatch,
 		)
 		protocol.RunToCompletion(h.ctx.Done())
 	default:
@@ -248,6 +296,67 @@ func (s *SessionManager) ListSessions() []SessionSummary {
 		}
 	}
 	return result
+}
+
+// RegisterWatcher adds a server-level watcher. It sends a snapshot of current
+// health and all active sessions, then streams subsequent events until the
+// caller calls UnregisterWatcher.
+func (s *SessionManager) RegisterWatcher() chan WatchEvent {
+	ch := make(chan WatchEvent, 64)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.watchMu.Lock()
+	defer s.watchMu.Unlock()
+
+	s.watchers[ch] = struct{}{}
+
+	// Send health snapshot.
+	sendLatest(ch, s.healthEvent())
+
+	// Send last known state for every active session.
+	for sid := range s.sessions {
+		if evt, ok := s.lastEvents[sid]; ok {
+			sendLatest(ch, *evt)
+		}
+	}
+	return ch
+}
+
+// UnregisterWatcher removes a server-level watcher and closes its channel.
+func (s *SessionManager) UnregisterWatcher(ch chan WatchEvent) {
+	s.watchMu.Lock()
+	defer s.watchMu.Unlock()
+	delete(s.watchers, ch)
+	close(ch)
+}
+
+// fanoutWatch sends an event to all registered watchers. Caller must hold watchMu.
+func (s *SessionManager) fanoutWatch(event WatchEvent) {
+	for ch := range s.watchers {
+		sendLatest(ch, event)
+	}
+}
+
+// broadcastHealth sends the current health to all watchers.
+// Acquires mu then watchMu (correct lock ordering).
+func (s *SessionManager) broadcastHealth() {
+	s.mu.Lock()
+	evt := s.healthEvent()
+	s.mu.Unlock()
+
+	s.watchMu.Lock()
+	defer s.watchMu.Unlock()
+	s.fanoutWatch(evt)
+}
+
+// healthEvent returns a WatchEvent with current health info. Caller must hold mu.
+func (s *SessionManager) healthEvent() WatchEvent {
+	return WatchEvent{
+		Type:           WatchEventHealth,
+		ActiveSessions: len(s.sessions),
+		MaxSessions:    s.cfg.MaxSessions,
+	}
 }
 
 // WatchSession registers a spectator channel on the given session.

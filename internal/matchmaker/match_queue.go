@@ -250,6 +250,7 @@ type QueuedPlayer struct {
 	PlayerID    internal.PlayerID `json:"player_id"`
 	Elo         int               `json:"elo"`
 	WaitSeconds float64           `json:"wait_seconds"`
+	Game        *game.Kind        `json:"game,omitempty"`
 }
 
 // QueuedPlayers returns a snapshot of all players currently in the queue.
@@ -262,6 +263,7 @@ func (q *MatchQueue) QueuedPlayers() []QueuedPlayer {
 			PlayerID:    c.pid,
 			Elo:         c.elo,
 			WaitSeconds: time.Since(c.entry).Seconds(),
+			Game:        c.game,
 		})
 	}
 	return result

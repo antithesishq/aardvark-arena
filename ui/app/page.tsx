@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { fetchStatus, fetchLeaderboard, StatusResponse, LeaderboardEntry } from "@/lib/api";
 import { StatCard } from "@/components/StatCard";
@@ -55,29 +55,26 @@ export default function MatchmakerPage() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  const refresh = useCallback(async () => {
+    try {
+      const [s, l] = await Promise.all([fetchStatus(), fetchLeaderboard()]);
+      setStatus(s);
+      setLeaderboard(l);
+      setError(null);
+    } catch (e) {
+      setError(String(e));
+    }
+  }, []);
+
   useEffect(() => {
     if (demo) return;
-    let cancelled = false;
+    refresh();
+    const id = setInterval(refresh, 3000);
+    return () => clearInterval(id);
+  }, [demo, refresh]);
 
-    async function poll() {
-      try {
-        const [s, l] = await Promise.all([fetchStatus(), fetchLeaderboard()]);
-        if (cancelled) return;
-        setStatus(s);
-        setLeaderboard(l);
-        setError(null);
-      } catch (e) {
-        if (!cancelled) setError(String(e));
-      }
-    }
-
-    poll();
-    const id = setInterval(poll, 3000);
-    return () => { cancelled = true; clearInterval(id); };
-  }, [demo]);
-
-  const sessions = demo ? demoStatus.sessions : (status?.sessions ?? []);
-  const queue    = demo ? demoStatus.queue    : (status?.queue ?? []);
+  const sessions = (demo ? demoStatus.sessions : (status?.sessions ?? [])).slice().sort((a, b) => a.session_id.localeCompare(b.session_id));
+  const queue    = (demo ? demoStatus.queue    : (status?.queue ?? [])).slice().sort((a, b) => a.player_id.localeCompare(b.player_id));
   const board    = demo ? DEMO_LEADERBOARD     : (leaderboard ?? []);
 
   return (
@@ -116,7 +113,7 @@ export default function MatchmakerPage() {
         <Leaderboard entries={board} />
       </div>
 
-      <ActiveSessions sessions={sessions} />
+      <ActiveSessions sessions={sessions} onRefresh={refresh} />
     </div>
   );
 }

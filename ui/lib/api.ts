@@ -4,6 +4,7 @@ export interface QueuedPlayer {
   player_id: string;
   elo: number;
   wait_seconds: number;
+  game?: "tictactoe" | "connect4" | "battleship";
 }
 
 export interface ActiveSession {
@@ -47,6 +48,7 @@ async function get<T>(url: string): Promise<T> {
 
 export const fetchStatus = () => get<StatusResponse>(`${MM}/status`);
 export const fetchLeaderboard = () => get<LeaderboardEntry[]>(`${MM}/leaderboard`);
+export const fetchServers = () => get<string[]>(`${MM}/servers`);
 export const fetchSessions = (serverUrl: string) =>
   get<SessionSummary[]>(`${serverUrl}/sessions`);
 export const fetchHealth = (serverUrl: string) =>

@@ -50,9 +50,11 @@ type Protocol[Move any, Shared any] struct {
 	turnTimeout time.Duration
 	turnTimer   *time.Timer
 	players     map[internal.PlayerID]playerConn
-	spectators  []chan PlayerMsg
-	state       game.State[Shared]
-	session     game.Session[Move, Shared]
+	spectators      []chan PlayerMsg
+	state           game.State[Shared]
+	session         game.Session[Move, Shared]
+	onWatch         func(players map[string]int, state json.RawMessage)
+	cachedPlayerMap map[string]int
 }
 
 // NewProtocol creates a Protocol that manages a game session.
@@ -64,6 +66,7 @@ func NewProtocol[M any, S any](
 	turnTimeout time.Duration,
 	state game.State[S],
 	session game.Session[M, S],
+	onWatch func(players map[string]int, state json.RawMessage),
 ) Protocol[M, S] {
 	return Protocol[M, S]{
 		inbox:       inbox,
@@ -77,6 +80,7 @@ func NewProtocol[M any, S any](
 		spectators: nil,
 		state:      state,
 		session:    session,
+		onWatch:    onWatch,
 	}
 }
 
@@ -193,8 +197,19 @@ func (p *Protocol[M, S]) handleConn(pid internal.PlayerID, conn chan PlayerMsg) 
 		conn <- PlayerMsg{Error: "too many players connected"}
 	}
 
+	// Rebuild cached player map for watch events.
+	p.cachedPlayerMap = make(map[string]int, len(p.players))
+	for id, pc := range p.players {
+		p.cachedPlayerMap[id.String()] = int(pc.player)
+	}
+
 	// make sure the new connection sees the latest state
 	p.SendState(pid)
+
+	// notify server-level watchers of updated player mapping
+	if encoded, err := json.Marshal(p.state); err == nil {
+		p.emitWatchEvent(encoded)
+	}
 }
 
 func (p *Protocol[M, S]) handleMove(pid internal.PlayerID, rawMove json.RawMessage) {
@@ -234,16 +249,25 @@ func (p *Protocol[M, S]) handleMove(pid internal.PlayerID, rawMove json.RawMessa
 
 // BroadcastState sends the current game state to all connected players.
 func (p *Protocol[M, S]) BroadcastState() {
-	for pid := range p.players {
-		p.SendState(pid)
-	}
 	encoded, err := json.Marshal(p.state)
 	if err != nil {
 		return
 	}
+	for _, pc := range p.players {
+		sendLatest(pc.conn, PlayerMsg{Player: pc.player, State: encoded})
+	}
 	for _, ch := range p.spectators {
 		sendLatest(ch, PlayerMsg{State: encoded})
 	}
+	p.emitWatchEvent(encoded)
+}
+
+// emitWatchEvent notifies server-level watchers of the current state.
+func (p *Protocol[M, S]) emitWatchEvent(encodedState json.RawMessage) {
+	if p.onWatch == nil {
+		return
+	}
+	p.onWatch(p.cachedPlayerMap, encodedState)
 }
 
 // sendLatest sends msg on ch without blocking. If the channel is full,

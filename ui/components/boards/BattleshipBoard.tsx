@@ -1,80 +1,59 @@
 "use client";
 
-// Attacks is a map from player index (0 or 1) to a map of Position -> AttackResult
-// Position: { X: col, Y: row }
-// AttackResult: 0 = Miss, 1 = Hit
-interface Position {
-  X: number;
-  Y: number;
-}
-
+// Attacks is { P1: { "x,y": 0|1 }, P2: { "x,y": 0|1 } }
+// Keys are "X,Y" strings, values are 0 = Miss, 1 = Hit
 type AttackResult = 0 | 1;
-type AttackMap = Record<string, AttackResult>; // key is JSON like "{X:0,Y:0}" but actually stored differently
 
 interface BattleshipShared {
-  Attacks: Record<string, Record<string, AttackResult>>;
+  Attacks: { P1: Record<string, AttackResult>; P2: Record<string, AttackResult> };
 }
 
 interface Props {
   shared: BattleshipShared;
-  viewPlayer?: number; // which player's perspective (0 or 1), default 0
 }
 
-// Parse the attack maps - Go marshals Position as {X:n, Y:n}
-function parseAttacks(raw: Record<string, AttackResult>): Map<string, AttackResult> {
-  const result = new Map<string, AttackResult>();
-  for (const [key, val] of Object.entries(raw ?? {})) {
-    // key format from Go: {"X":2,"Y":3}
-    try {
-      const pos = JSON.parse(key) as Position;
-      result.set(`${pos.X},${pos.Y}`, val);
-    } catch {
-      // skip unparseable keys
-    }
-  }
-  return result;
-}
+const COLS = 10;
+const ROWS = 10;
 
-export function BattleshipBoard({ shared, viewPlayer = 0 }: Props) {
-  // Show attacks ON the opponent's board (what the viewPlayer is shooting at)
-  const opponentKey = viewPlayer === 0 ? "1" : "0";
-  const attacksOnOpponent = parseAttacks(shared.Attacks?.[opponentKey] ?? {});
-
-  const COLS = 10;
-  const ROWS = 10;
-
+function MiniGrid({ attacks, label }: { attacks: Record<string, AttackResult>; label: string }) {
   return (
-    <div className="flex flex-col gap-0.5">
+    <div className="flex flex-col items-center gap-1 flex-1">
       <div
-        className="grid gap-0.5"
+        className="grid gap-px w-full"
         style={{ gridTemplateColumns: `repeat(${COLS}, 1fr)` }}
       >
         {Array.from({ length: ROWS }, (_, row) =>
           Array.from({ length: COLS }, (_, col) => {
             const key = `${col},${row}`;
-            const attack = attacksOnOpponent.get(key);
+            const attack = attacks[key];
             return (
               <div
                 key={key}
-                className="aspect-square rounded-sm"
+                className="aspect-square rounded-[2px]"
                 style={{
                   backgroundColor:
                     attack === 1
                       ? "#ef4444" // hit = red
                       : attack === 0
-                      ? "#374151" // miss = dark gray
-                      : "#1f2937", // empty = even darker
-                  minWidth: 16,
-                  minHeight: 16,
+                      ? "#6b7280" // miss = gray
+                      : "#1e293b", // empty = slate
                 }}
               />
             );
           })
         )}
       </div>
-      <div className="text-[9px] text-zinc-600 uppercase tracking-wider text-center mt-1">
-        {viewPlayer === 0 ? "P1" : "P2"} VIEW
-      </div>
+      <span className="text-[8px] text-zinc-500 uppercase tracking-widest">{label}</span>
+    </div>
+  );
+}
+
+export function BattleshipBoard({ shared }: Props) {
+  const attacks = shared.Attacks ?? {};
+  return (
+    <div className="flex gap-3 items-start w-full max-h-full">
+      <MiniGrid attacks={attacks.P1 ?? {}} label="P1" />
+      <MiniGrid attacks={attacks.P2 ?? {}} label="P2" />
     </div>
   );
 }

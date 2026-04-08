@@ -60,6 +60,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /sessions", s.handleListSessions)
 	s.mux.HandleFunc("GET /session/{sid}/watch", s.handleWatchSession)
 	s.mux.HandleFunc("DELETE /session/{sid}", s.handleCancelSession)
+	s.mux.HandleFunc("GET /watch", s.handleWatch)
 }
 
 // HealthResponse contains the server health status.
@@ -196,4 +197,26 @@ func (s *Server) handleCancelSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_, _ = w.Write([]byte("ok"))
+}
+
+func (s *Server) handleWatch(w http.ResponseWriter, r *http.Request) {
+	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+		InsecureSkipVerify: true,
+	})
+	if err != nil {
+		log.Printf("watch websocket upgrade failed: %v", err)
+		return
+	}
+	// Discard reads so the server detects client-initiated close promptly.
+	conn.CloseRead(r.Context())
+
+	ch := s.sessions.RegisterWatcher()
+	defer s.sessions.UnregisterWatcher(ch)
+	for evt := range ch {
+		if err := wsjson.Write(r.Context(), conn, evt); err != nil {
+			_ = conn.Close(websocket.StatusInternalError, "write failed")
+			return
+		}
+	}
+	_ = conn.Close(websocket.StatusNormalClosure, "done")
 }

@@ -1,25 +1,37 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { fetchServers } from "@/lib/api";
 import { GameServerSection } from "@/components/GameServerSection";
-
-// Game server URLs — configured via env var as a comma-separated list.
-// Falls back to a single localhost server for local dev.
-const raw = process.env.NEXT_PUBLIC_GAME_SERVER_URLS ?? "http://localhost:8081";
-const SERVERS = raw.split(",").map((s) => s.trim()).filter(Boolean);
+import { mono } from "@/lib/utils";
 
 function serverLabel(url: string, index: number): string {
   try {
     const u = new URL(url);
-    return u.hostname.toUpperCase();
+    return u.port ? `${u.hostname.toUpperCase()}:${u.port}` : u.hostname.toUpperCase();
   } catch {
     return `GS-${String(index + 1).padStart(2, "0")}`;
   }
 }
 
 export default function GameServerPage() {
+  const [servers, setServers] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchServers()
+      .then(setServers)
+      .catch((e) => setError(String(e)));
+  }, []);
+
   return (
     <div className="max-w-7xl mx-auto px-6">
-      {SERVERS.map((url, i) => (
+      {error && (
+        <div className="text-xs text-red-400 py-2 mb-2" style={mono}>
+          Cannot fetch server list from matchmaker: {error}
+        </div>
+      )}
+      {servers.map((url, i) => (
         <GameServerSection
           key={url}
           serverUrl={url}

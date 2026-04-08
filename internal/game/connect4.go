@@ -119,16 +119,22 @@ func (s *Connect4Session) MakeMove(state State[Connect4Board], player Player, co
 
 // Connect4Ai implements Ai for Connect4.
 type Connect4Ai struct {
-	rng *rand.Rand
+	rng       *rand.Rand
+	preferred []int
 }
 
 // NewConnect4Ai creates a new Connect4 AI for the given player.
 func NewConnect4Ai() *Connect4Ai {
-	return &Connect4Ai{rng: internal.NewRand()}
+	rng := internal.NewRand()
+	preferred := []int{3, 2, 4, 1, 5, 0, 6}
+	rng.Shuffle(len(preferred), func(i, j int) {
+		preferred[i], preferred[j] = preferred[j], preferred[i]
+	})
+	return &Connect4Ai{rng: rng, preferred: preferred}
 }
 
 // GetMove returns the AI's chosen column.
-// Strategy: win if possible, block opponent win, otherwise prefer center columns.
+// Strategy: win if possible, block opponent win, otherwise use shuffled column preference.
 func (ai *Connect4Ai) GetMove(player Player, board Connect4Board) (int, error) {
 	validCols := board.validColumns()
 	if len(validCols) == 0 {
@@ -152,9 +158,8 @@ func (ai *Connect4Ai) GetMove(player Player, board Connect4Board) (int, error) {
 		}
 	}
 
-	// Prefer center columns (3, 2, 4, 1, 5, 0, 6)
-	preferred := []int{3, 2, 4, 1, 5, 0, 6}
-	for _, col := range preferred {
+	// Use shuffled column preference (randomized at AI creation)
+	for _, col := range ai.preferred {
 		if board.lowestEmpty(col) >= 0 {
 			return col, nil
 		}

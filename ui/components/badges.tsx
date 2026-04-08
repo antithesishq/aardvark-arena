@@ -46,20 +46,28 @@ export function GameBadgeShort({ game }: { game: string }) {
   );
 }
 
-export function OnlineBadge() {
+const statusStyles: Record<string, { bg: string; dot: string; pulse?: boolean }> = {
+  connected:    { bg: "bg-emerald-900/60 text-emerald-400 border-emerald-700", dot: "bg-emerald-400", pulse: true },
+  full:         { bg: "bg-amber-900/60 text-amber-400 border-amber-700",       dot: "bg-amber-400" },
+  disconnected: { bg: "bg-red-900/60 text-red-400 border-red-700",             dot: "bg-red-400" },
+};
+
+function StatusBadge({ status, label }: { status: string; label: string }) {
+  const s = statusStyles[status] ?? statusStyles.disconnected;
   return (
-    <span style={mono} className="flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-bold tracking-widest bg-emerald-900/60 text-emerald-400 border border-emerald-700 rounded">
-      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-      ONLINE
+    <span style={mono} className={cn("flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-bold tracking-widest border rounded", s.bg)}>
+      <span className={cn("w-1.5 h-1.5 rounded-full", s.dot, s.pulse && "animate-pulse")} />
+      {label}
     </span>
   );
 }
 
-export function DegradedBadge() {
-  return (
-    <span style={mono} className="flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-bold tracking-widest bg-amber-900/60 text-amber-400 border border-amber-700 rounded">
-      <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-      DEGRADED
-    </span>
-  );
+export function ConnectedBadge({ degraded }: { degraded?: boolean }) {
+  return degraded
+    ? <StatusBadge status="full" label="FULL" />
+    : <StatusBadge status="connected" label="CONNECTED" />;
+}
+
+export function DisconnectedBadge() {
+  return <StatusBadge status="disconnected" label="DISCONNECTED" />;
 }

@@ -21,7 +21,7 @@ export function Leaderboard({ entries }: Props) {
       <table className="w-full text-sm">
         <thead>
           <tr className="text-[10px] tracking-widest text-zinc-400 uppercase border-b border-zinc-800" style={mono}>
-            <th className="text-left pb-2 font-medium">Bot</th>
+            <th className="text-left pb-2 font-medium">Player</th>
             <th className="text-left pb-2 font-medium">ELO</th>
             <th className="text-right pb-2 font-medium">W/L</th>
           </tr>

@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"errors"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -23,7 +25,7 @@ func NewHTTPClient() *http.Client {
 // HTTPIsTemporary reports whether err is a temporary or timeout URL error.
 func HTTPIsTemporary(err error) bool {
 	if urlerr, ok := err.(*url.Error); ok {
-		return urlerr.Temporary() || urlerr.Timeout()
+		return urlerr.Temporary() || urlerr.Timeout() || errors.Is(urlerr, io.EOF)
 	}
 	return false
 }
