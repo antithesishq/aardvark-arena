@@ -9,8 +9,20 @@ Go project for educational purposes. Keep code simple and clean.
 - `go test ./...` - run tests
 - `golangci-lint run` - lint and check for issues
 
+## Running locally
+
+- `hivemind` — starts everything (matchmaker, 2 game servers, 100-player swarm, UI)
+- Open http://localhost:3000 to see the dashboard
+
 ## Frontend (ui/)
 
 - Next.js + React + TypeScript + Tailwind + shadcn/ui
 - `cd ui && npm install && npm run dev` — start dev server
 - `cd ui && npm run build` — production build
+
+## UI property tests (Bombadil)
+
+- `cd ui && npm run bombadil` — headless run (1 min, exits on first violation)
+- `cd ui && npm run bombadil:headed` — headed run for debugging
+- Chrome is installed automatically via `@puppeteer/browsers`; `ui/chrome/chrome-wrapper.sh` launches it with `--disable-features=LocalNetworkAccessChecks` to avoid macOS local network permission prompts in headless mode
+- Spec lives in `ui/bombadil.spec.ts`
