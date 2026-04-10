@@ -4,8 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { WatchEvent, GameState } from "@/lib/ws";
 import { watchServer } from "@/lib/ws";
 import { GameCard } from "./GameCard";
-import { ConnectedBadge, DisconnectedBadge } from "./badges";
-import { mono } from "@/lib/utils";
 
 const LINGER_MS = 2000;
 
@@ -16,12 +14,21 @@ export interface SessionState {
   gameState: GameState | null;
 }
 
+export interface ServerHealth {
+  connected: boolean;
+  active: number;
+  max: number;
+  degraded: boolean;
+}
+
 interface Props {
   serverUrl: string;
   label: string;
+  hidden?: boolean;
+  onHealthChange?: (health: ServerHealth) => void;
 }
 
-export function GameServerSection({ serverUrl, label }: Props) {
+export function GameServerSection({ serverUrl, label, hidden, onHealthChange }: Props) {
   const [connected, setConnected] = useState(false);
   const [health, setHealth] = useState<{ active: number; max: number } | null>(null);
   const [sessions, setSessions] = useState<Map<string, SessionState>>(new Map());
@@ -82,6 +89,16 @@ export function GameServerSection({ serverUrl, label }: Props) {
     };
   }, [serverUrl, handleEvent]);
 
+  // Bubble health state up to parent for tab rendering
+  useEffect(() => {
+    onHealthChange?.({
+      connected,
+      active: health?.active ?? 0,
+      max: health?.max ?? 0,
+      degraded: health ? health.active >= health.max : false,
+    });
+  }, [connected, health, onHealthChange]);
+
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -92,28 +109,13 @@ export function GameServerSection({ serverUrl, label }: Props) {
     () => Array.from(sessions.values()).sort((a, b) => a.session_id.localeCompare(b.session_id)),
     [sessions],
   );
-  const isDegraded = health ? health.active >= health.max : false;
+  if (hidden) return null;
 
   return (
-    <div className="mb-8">
-      {/* Section header */}
-      <div className="flex items-center gap-3 mb-3 border-b border-zinc-800 pb-2">
-        <span className="text-sm font-bold text-zinc-300 tracking-widest" style={mono}>
-          {label}
-        </span>
-        {connected ? (
-          isDegraded ? <ConnectedBadge degraded /> : <ConnectedBadge />
-        ) : (
-          <DisconnectedBadge />
-        )}
-        <span className="ml-auto text-xs text-zinc-400">
-          {sorted.length} session{sorted.length !== 1 ? "s" : ""} active
-        </span>
-      </div>
-
+    <div>
       {/* Game cards */}
       {sorted.length === 0 ? (
-        <div className="text-xs text-zinc-400 py-4 text-center">No active sessions</div>
+        <div className="text-xs text-zinc-400 py-8 text-center">No active sessions</div>
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(288px,1fr))] gap-4">
           {sorted.map((s) => (

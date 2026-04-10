@@ -348,7 +348,7 @@ const selectLeaderboard = `
 	SELECT player_id, elo, wins, losses, draws
 	FROM players
 	ORDER BY elo DESC
-	LIMIT 20
+	LIMIT 10
 `
 
 // ActiveSessionView is a session with its player IDs for the status endpoint.
