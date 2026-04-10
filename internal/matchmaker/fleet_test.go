@@ -85,4 +85,29 @@ func TestFleetSanity(t *testing.T) {
 			t.Fatalf("expected ErrNoServersAvailable, got %v", err)
 		}
 	})
+
+	t.Run("ResetRetry clears retryAt", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusServiceUnavailable)
+		}))
+		defer srv.Close()
+
+		u, _ := url.Parse(srv.URL)
+		fleet := NewFleet([]*url.URL{u}, internal.NilToken, 5*time.Minute)
+
+		// Drive the server into retryAt by getting a 503.
+		_, err := fleet.CreateSession(game.TicTacToe)
+		if err != ErrNoServersAvailable {
+			t.Fatalf("expected ErrNoServersAvailable, got %v", err)
+		}
+		if fleet.servers[0].retryAt == nil {
+			t.Fatal("expected retryAt to be set after 503")
+		}
+
+		// Reset and verify the server is available again.
+		fleet.ResetRetry(u.String())
+		if fleet.servers[0].retryAt != nil {
+			t.Fatal("expected retryAt to be nil after ResetRetry")
+		}
+	})
 }

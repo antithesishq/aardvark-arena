@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/antithesishq/aardvark-arena/internal"
@@ -25,6 +26,7 @@ var ErrNoServersAvailable = fmt.Errorf("no gameservers available")
 
 // Fleet monitors a collection of GameServers and handles session creation.
 type Fleet struct {
+	mu             sync.Mutex
 	servers        []*server
 	client         *http.Client
 	token          internal.Token
@@ -64,8 +66,25 @@ type SessionInfo struct {
 	Timeout   time.Duration
 }
 
+// ResetRetry clears the retryAt on the server matching the given URL, allowing
+// it to be used as a candidate immediately. This should be called when a session
+// on the server ends, since the server likely has capacity again.
+func (f *Fleet) ResetRetry(serverURL string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, s := range f.servers {
+		if s.url.String() == serverURL {
+			s.retryAt = nil
+			return
+		}
+	}
+}
+
 // CreateSession creates a new game session on an available server.
 func (f *Fleet) CreateSession(kind game.Kind) (*SessionInfo, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	// gather candidates
 	var candidates []*server
 	now := time.Now()

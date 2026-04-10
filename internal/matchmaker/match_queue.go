@@ -216,15 +216,21 @@ func (q *MatchQueue) Unqueue(pid internal.PlayerID) {
 }
 
 // Untrack removes a session and associated players, allowing them to requeue
-// for another match.
+// for another match. It also resets the retryAt on the gameserver that hosted
+// the session so it can immediately accept new sessions.
 func (q *MatchQueue) Untrack(sid internal.SessionID) {
 	q.mu.Lock()
-	defer q.mu.Unlock()
-
+	var serverURL string
 	for pid, session := range q.matched {
 		if session.SessionID == sid {
+			serverURL = session.Server.String()
 			delete(q.matched, pid)
 		}
+	}
+	q.mu.Unlock()
+
+	if serverURL != "" {
+		q.fleet.ResetRetry(serverURL)
 	}
 }
 
