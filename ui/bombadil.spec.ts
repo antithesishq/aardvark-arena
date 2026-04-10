@@ -2,7 +2,6 @@ import {
   extract,
   always,
   eventually,
-  now,
   actions,
   weighted,
   type Action,
@@ -154,13 +153,9 @@ export const winnerShownThenDisappears = always(() => {
   if (winners.length === 0) return true;
   const card = winners[0];
   const id = card.id;
-  const result = card.result;
   if (!id) return true;
-  // The winner text is visible right now (the extractor proved it);
-  // assert the card will eventually be cleaned up.
-  return now(() => result.includes("wins")).and(
-    eventually(() => !gameCardIds.current.includes(id)).within(10, "seconds"),
-  );
+  // The extractor already confirmed the winner text is visible; assert cleanup.
+  return eventually(() => !gameCardIds.current.includes(id)).within(10, "seconds");
 });
 
 // ============================================================
@@ -204,5 +199,5 @@ export const explore = actions(() => {
       { Click: { name: "gameserver-nav", point: { x: gsPt[0], y: gsPt[1] } } },
     ]);
 
-  return weighted(weighted_actions as [number, Action][]).generate();
+  return weighted(weighted_actions).generate();
 });
