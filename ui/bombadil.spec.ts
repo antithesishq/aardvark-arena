@@ -146,47 +146,6 @@ export const winnerShownThenDisappears = always(() => {
   // The winner text is visible right now (the extractor proved it);
   // assert the card will eventually be cleaned up.
   return now(() => result.includes("wins")).and(
-    eventually(() => !gameCardIds.current.includes(id)).within(
-      10,
-      "seconds",
-    ),
+    eventually(() => !gameCardIds.current.includes(id)).within(10, "seconds"),
   );
-});
-
-// ============================================================
-// Action Generators
-// ============================================================
-
-// Click a Cancel button in the matchmaker's active sessions list.
-export const clickCancel = actions(() => {
-  const pts = cancelButtonPoints.current;
-  return pts.map((pt: number[]) => ({
-    Click: {
-      name: "cancel-session",
-      point: { x: pt[0], y: pt[1] },
-    },
-  }));
-});
-
-// Navigate to the Matchmaker page.
-export const goToMatchmaker = actions(() => {
-  const pt = matchmakerNavPoint.current;
-  return pt
-    ? [{ Click: { name: "nav-matchmaker", point: { x: pt[0], y: pt[1] } } }]
-    : [];
-});
-
-// Navigate to the Game Servers page.
-export const goToGameServers = actions(() => {
-  const pt = gameServerNavPoint.current;
-  return pt
-    ? [
-        {
-          Click: {
-            name: "nav-game-servers",
-            point: { x: pt[0], y: pt[1] },
-          },
-        },
-      ]
-    : [];
 });
