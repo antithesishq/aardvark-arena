@@ -24,6 +24,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
       type="button"
       role="switch"
       aria-checked={checked}
+      id="server-toggle"
       onClick={() => onChange(!checked)}
       className={cn(
         "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/30",
@@ -87,12 +88,12 @@ export default function GameServerPage() {
       {servers.length > 0 && (
         <div className="flex items-center gap-3 mb-4">
           <Select value={selected} onValueChange={setSelected}>
-            <SelectTrigger style={mono}>
+            <SelectTrigger data-testid="server-select-trigger" style={mono}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {servers.map((s) => (
-                <SelectItem key={s.url} value={s.url} style={mono}>
+                <SelectItem key={s.url} value={s.url} data-testid="server-select-item" style={mono}>
                   {serverLabel(s)}
                 </SelectItem>
               ))}
@@ -103,7 +104,7 @@ export default function GameServerPage() {
           {(() => {
             if (!h) return null;
             if (!h.connected) return <StatusBadge status="disconnected" label="OFFLINE" />;
-            return <StatusBadge status={h.degraded ? "full" : "connected"} label={`${h.active}/${h.max}`} />;
+            return <span data-testid="server-health" data-active={h.active}><StatusBadge status={h.degraded ? "full" : "connected"} label={`${h.active}/${h.max}`} /></span>;
           })()}
 
           {/* Enabled toggle */}
@@ -133,6 +134,7 @@ export default function GameServerPage() {
           {/* Force cancel — only when draining */}
           {draining && (
             <Button size="sm" variant="destructive" style={mono}
+              id="force-btn"
               onClick={() => selected && cancelAllSessions(selected)}>
               Force
             </Button>

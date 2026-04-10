@@ -12,6 +12,9 @@
 
 # testing
 /coverage
+/chrome
+!/chrome/chrome-wrapper.sh
+/bombadil-report
 
 # next.js
 /.next/
