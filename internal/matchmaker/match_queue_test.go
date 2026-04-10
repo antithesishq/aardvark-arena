@@ -10,6 +10,7 @@ import (
 	"github.com/antithesishq/aardvark-arena/internal"
 	"github.com/antithesishq/aardvark-arena/internal/game"
 	"github.com/google/uuid"
+	"hegel.dev/go/hegel"
 )
 
 func MustDB(t *testing.T) *DB {
@@ -100,4 +101,73 @@ func TestMatchQueueSanity(t *testing.T) {
 			t.Error("expected players with distant elo to remain unmatched")
 		}
 	})
+}
+
+func TestSelectMatchGameProperties(t *testing.T) {
+	allKinds := game.AllGames[:]
+
+	t.Run("same preference always matches", hegel.Case(func(ht *hegel.T) {
+		k := hegel.Draw(ht, hegel.SampledFrom(allKinds))
+		a := &k
+		b := &k
+		chosen, ok := selectMatchGame(a, b)
+		if !ok {
+			ht.Fatalf("same preference %v should match", k)
+		}
+		if chosen != k {
+			ht.Fatalf("expected %v, got %v", k, chosen)
+		}
+	}))
+
+	t.Run("different preferences do not match", hegel.Case(func(ht *hegel.T) {
+		i := hegel.Draw(ht, hegel.Integers[int](0, len(allKinds)-1))
+		j := hegel.Draw(ht, hegel.Integers[int](0, len(allKinds)-1))
+		ht.Assume(i != j)
+		a := &allKinds[i]
+		b := &allKinds[j]
+		_, ok := selectMatchGame(a, b)
+		if ok {
+			ht.Fatalf("different preferences %v and %v should not match", *a, *b)
+		}
+	}))
+
+	t.Run("one preference is used", hegel.Case(func(ht *hegel.T) {
+		k := hegel.Draw(ht, hegel.SampledFrom(allKinds))
+		pref := &k
+
+		// a has preference, b is nil
+		chosen, ok := selectMatchGame(pref, nil)
+		if !ok {
+			ht.Fatalf("one preference should match")
+		}
+		if chosen != k {
+			ht.Fatalf("expected preference %v, got %v", k, chosen)
+		}
+
+		// b has preference, a is nil
+		chosen, ok = selectMatchGame(nil, pref)
+		if !ok {
+			ht.Fatalf("one preference should match")
+		}
+		if chosen != k {
+			ht.Fatalf("expected preference %v, got %v", k, chosen)
+		}
+	}))
+
+	t.Run("no preference returns a valid game", hegel.Case(func(ht *hegel.T) {
+		chosen, ok := selectMatchGame(nil, nil)
+		if !ok {
+			ht.Fatal("nil/nil should always match")
+		}
+		valid := false
+		for _, k := range game.AllGames {
+			if chosen == k {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			ht.Fatalf("chosen game %v is not a valid kind", chosen)
+		}
+	}))
 }
