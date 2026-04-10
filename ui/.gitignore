@@ -13,6 +13,10 @@
 # testing
 /coverage
 
+# browser binaries (installed by @puppeteer/browsers)
+/chrome/*
+!/chrome/chrome-wrapper.sh
+
 # next.js
 /.next/
 /out/
