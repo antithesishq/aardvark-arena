@@ -5,6 +5,7 @@ import {
   actions,
   weighted,
   type Action,
+  ActionGenerator,
 } from "@antithesishq/bombadil";
 // Re-export default properties (uncaught exceptions, console errors, etc.)
 // but NOT default actions — we define our own below.
@@ -171,33 +172,35 @@ export const explore = actions(() => {
   }
 
   const center = { x: 512, y: 384 };
-  const weighted_actions: [number, Action][] = [
+  const weightedActions: [number, Action | ActionGenerator][] = [
     [6, "Wait"],   // frequently pause so data has time to update
     [3, "Reload"], // occasionally reload to exercise the polling path
     [1, "Back"],
     [2, { ScrollDown: { origin: center, distance: 200 } }],
-    [1, { ScrollUp:   { origin: center, distance: 200 } }],
+    [1, { ScrollUp: { origin: center, distance: 200 } }],
   ];
 
   // Click cancel buttons that are ready (not already in-flight).
+  const cancelActions: Action[] = [];
   for (const [x, y] of cancelButtonPoints.current) {
-    weighted_actions.push([4, { Click: { name: "cancel", point: { x, y } } }]);
+    cancelActions.push({ Click: { name: "cancel", point: { x, y } } });
   }
+  weightedActions.push([4, actions(() => cancelActions)]);
 
   // Navigate between pages via the nav links.
   const mmPt = matchmakerNavPoint.current;
   if (mmPt)
-    weighted_actions.push([
+    weightedActions.push([
       2,
       { Click: { name: "matchmaker-nav", point: { x: mmPt[0], y: mmPt[1] } } },
     ]);
 
   const gsPt = gameServerNavPoint.current;
   if (gsPt)
-    weighted_actions.push([
+    weightedActions.push([
       2,
       { Click: { name: "gameserver-nav", point: { x: gsPt[0], y: gsPt[1] } } },
     ]);
 
-  return weighted(weighted_actions).generate();
+  return weighted(weightedActions).generate();
 });
