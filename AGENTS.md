@@ -12,7 +12,7 @@ Go project for educational purposes. Keep code simple and clean.
 ## Running locally
 
 - `hivemind` — starts everything (matchmaker, 2 game servers, 100-player swarm, UI)
-- Open http://localhost:3000 to see the dashboard
+- Open http://localhost:3001 to see the dashboard
 
 ## Frontend (ui/)
 
@@ -24,5 +24,5 @@ Go project for educational purposes. Keep code simple and clean.
 
 - `cd ui && npm run bombadil` — headless run (1 min, exits on first violation)
 - `cd ui && npm run bombadil:headed` — headed run for debugging
-- Chrome is installed automatically via `@puppeteer/browsers`; `ui/chrome/chrome-wrapper.sh` launches it with `--disable-features=LocalNetworkAccessChecks` to avoid macOS local network permission prompts in headless mode
+- `ui/chrome/chrome-wrapper.sh` auto-installs and runs Chrome for Testing, passing arguments transparently
 - Spec lives in `ui/bombadil.spec.ts`
