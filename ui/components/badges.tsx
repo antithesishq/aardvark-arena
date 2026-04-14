@@ -49,10 +49,11 @@ export function GameBadgeShort({ game }: { game: string }) {
 const statusStyles: Record<string, { bg: string; dot: string; pulse?: boolean }> = {
   connected:    { bg: "bg-emerald-900/60 text-emerald-400 border-emerald-700", dot: "bg-emerald-400", pulse: true },
   full:         { bg: "bg-amber-900/60 text-amber-400 border-amber-700",       dot: "bg-amber-400" },
+  draining:     { bg: "bg-yellow-900/60 text-yellow-400 border-yellow-700",    dot: "bg-yellow-400", pulse: true },
   disconnected: { bg: "bg-red-900/60 text-red-400 border-red-700",             dot: "bg-red-400" },
 };
 
-function StatusBadge({ status, label }: { status: string; label: string }) {
+export function StatusBadge({ status, label }: { status: string; label: string }) {
   const s = statusStyles[status] ?? statusStyles.disconnected;
   return (
     <span style={mono} className={cn("flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-bold tracking-widest border rounded", s.bg)}>

@@ -62,7 +62,7 @@ export function GameCard({ session, serverUrl, elapsedSeconds }: Props) {
   }
 
   return (
-    <div className="bg-zinc-900/20 border border-zinc-800 rounded backdrop-blur-sm p-3 flex flex-col gap-2 w-full aspect-square min-h-0 overflow-hidden">
+    <div data-testid="game-card" data-session-id={session.session_id} className="bg-zinc-900/20 border border-zinc-800 rounded backdrop-blur-sm p-3 flex flex-col gap-2 w-full aspect-square min-h-0 overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between">
         <span className="text-xs text-zinc-400" style={mono}>{shortId4(session.session_id)}</span>
@@ -73,7 +73,7 @@ export function GameCard({ session, serverUrl, elapsedSeconds }: Props) {
       <div className="flex-1 min-h-0 flex items-center justify-center overflow-hidden">
         {isFinished ? (
           <div className="flex flex-col items-center gap-1 py-4">
-            <span className="text-lg font-bold text-zinc-100" style={mono}>
+            <span data-testid="game-result" className="text-lg font-bold text-zinc-100" style={mono}>
               {status === STATUS_P1_WIN ? "Player 1 wins!" :
                status === STATUS_P2_WIN ? "Player 2 wins!" :
                status === STATUS_DRAW ? "Draw!" : "Cancelled"}

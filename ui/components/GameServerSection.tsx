@@ -4,8 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { WatchEvent, GameState } from "@/lib/ws";
 import { watchServer } from "@/lib/ws";
 import { GameCard } from "./GameCard";
-import { ConnectedBadge, DisconnectedBadge } from "./badges";
-import { mono } from "@/lib/utils";
 
 const LINGER_MS = 2000;
 
@@ -16,14 +14,24 @@ export interface SessionState {
   gameState: GameState | null;
 }
 
+export interface ServerHealth {
+  connected: boolean;
+  active: number;
+  max: number;
+  degraded: boolean;
+  enabled: boolean;
+}
+
 interface Props {
   serverUrl: string;
   label: string;
+  hidden?: boolean;
+  onHealthChange?: (health: ServerHealth) => void;
 }
 
-export function GameServerSection({ serverUrl, label }: Props) {
+export function GameServerSection({ serverUrl, label, hidden, onHealthChange }: Props) {
   const [connected, setConnected] = useState(false);
-  const [health, setHealth] = useState<{ active: number; max: number } | null>(null);
+  const [health, setHealth] = useState<{ active: number; max: number; serverActive: boolean } | null>(null);
   const [sessions, setSessions] = useState<Map<string, SessionState>>(new Map());
   const [startTimes, setStartTimes] = useState<Record<string, number>>({});
 
@@ -32,14 +40,11 @@ export function GameServerSection({ serverUrl, label }: Props) {
 
   const handleEvent = useCallback((evt: WatchEvent) => {
     if (evt.type === "health") {
-      setHealth({ active: evt.active_sessions, max: evt.max_sessions });
+      setHealth({ active: evt.active_sessions, max: evt.max_sessions, serverActive: evt.active });
     } else if (evt.type === "session") {
-      // Cancel any pending linger removal
-      const timer = lingerTimers.current.get(evt.session_id);
-      if (timer) {
-        clearTimeout(timer);
-        lingerTimers.current.delete(evt.session_id);
-      }
+      // Ignore updates for sessions already ending — prevents race where a
+      // late "session" event cancels the linger timer and the card sticks.
+      if (lingerTimers.current.has(evt.session_id)) return;
 
       setSessions((prev) => {
         const next = new Map(prev);
@@ -73,7 +78,16 @@ export function GameServerSection({ serverUrl, label }: Props) {
   }, []);
 
   useEffect(() => {
-    const cleanup = watchServer(serverUrl, handleEvent, setConnected);
+    const cleanup = watchServer(serverUrl, handleEvent, (conn) => {
+      if (conn) {
+        // Clear stale sessions on (re)connect — server will re-send active ones
+        setSessions(new Map());
+        setStartTimes({});
+        for (const t of lingerTimers.current.values()) clearTimeout(t);
+        lingerTimers.current.clear();
+      }
+      setConnected(conn);
+    });
     return () => {
       cleanup();
       // Clear all linger timers on unmount
@@ -82,6 +96,17 @@ export function GameServerSection({ serverUrl, label }: Props) {
     };
   }, [serverUrl, handleEvent]);
 
+  // Bubble health state up to parent for tab rendering
+  useEffect(() => {
+    onHealthChange?.({
+      connected,
+      active: health?.active ?? 0,
+      max: health?.max ?? 0,
+      degraded: health ? health.active >= health.max : false,
+      enabled: health?.serverActive ?? true,
+    });
+  }, [connected, health, onHealthChange]);
+
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -89,31 +114,16 @@ export function GameServerSection({ serverUrl, label }: Props) {
   }, []);
 
   const sorted = useMemo(
-    () => Array.from(sessions.values()).sort((a, b) => a.session_id.localeCompare(b.session_id)),
-    [sessions],
+    () => Array.from(sessions.values()).sort((a, b) => (startTimes[a.session_id] ?? 0) - (startTimes[b.session_id] ?? 0)),
+    [sessions, startTimes],
   );
-  const isDegraded = health ? health.active >= health.max : false;
+  if (hidden) return null;
 
   return (
-    <div className="mb-8">
-      {/* Section header */}
-      <div className="flex items-center gap-3 mb-3 border-b border-zinc-800 pb-2">
-        <span className="text-sm font-bold text-zinc-300 tracking-widest" style={mono}>
-          {label}
-        </span>
-        {connected ? (
-          isDegraded ? <ConnectedBadge degraded /> : <ConnectedBadge />
-        ) : (
-          <DisconnectedBadge />
-        )}
-        <span className="ml-auto text-xs text-zinc-400">
-          {sorted.length} session{sorted.length !== 1 ? "s" : ""} active
-        </span>
-      </div>
-
+    <div>
       {/* Game cards */}
       {sorted.length === 0 ? (
-        <div className="text-xs text-zinc-400 py-4 text-center">No active sessions</div>
+        <div className="text-xs text-zinc-400 py-8 text-center">No active sessions</div>
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(288px,1fr))] gap-4">
           {sorted.map((s) => (

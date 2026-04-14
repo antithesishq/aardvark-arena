@@ -15,6 +15,11 @@ import (
 // PlayerID identifies a player.
 type PlayerID = uuid.UUID
 
+// ShortID returns the first 8 hex characters of a UUID for display purposes.
+func ShortID(id uuid.UUID) string {
+	return id.String()[:8]
+}
+
 // SessionID identifies a game session.
 type SessionID = uuid.UUID
 
@@ -118,7 +123,7 @@ func RespondJSON(w http.ResponseWriter, data any) error {
 func CORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)

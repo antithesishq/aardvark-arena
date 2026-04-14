@@ -38,6 +38,7 @@ export interface HealthResponse {
   ActiveSessions: number;
   MaxSessions: number;
   Full: boolean;
+  Active: boolean;
 }
 
 async function get<T>(url: string): Promise<T> {
@@ -46,9 +47,14 @@ async function get<T>(url: string): Promise<T> {
   return res.json();
 }
 
+export interface ServerInfo {
+  id: string;
+  url: string;
+}
+
 export const fetchStatus = () => get<StatusResponse>(`${MM}/status`);
 export const fetchLeaderboard = () => get<LeaderboardEntry[]>(`${MM}/leaderboard`);
-export const fetchServers = () => get<string[]>(`${MM}/servers`);
+export const fetchServers = () => get<ServerInfo[]>(`${MM}/servers`);
 export const fetchSessions = (serverUrl: string) =>
   get<SessionSummary[]>(`${serverUrl}/sessions`);
 export const fetchHealth = (serverUrl: string) =>
@@ -62,3 +68,15 @@ export const cancelSessionViaMatchmaker = (sessionId: string) =>
 // Cancel directly on a game server (used from the game server tab).
 export const cancelSession = (serverUrl: string, sessionId: string) =>
   fetch(`${serverUrl}/session/${sessionId}`, { method: "DELETE" });
+
+// Drain a game server (stop accepting new sessions).
+export const drainServer = (serverUrl: string) =>
+  fetch(`${serverUrl}/drain`, { method: "POST" });
+
+// Activate a drained game server (resume accepting new sessions).
+export const activateServer = (serverUrl: string) =>
+  fetch(`${serverUrl}/activate`, { method: "POST" });
+
+// Cancel all active sessions on a game server.
+export const cancelAllSessions = (serverUrl: string) =>
+  fetch(`${serverUrl}/sessions`, { method: "DELETE" });

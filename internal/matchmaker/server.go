@@ -12,6 +12,7 @@ import (
 	"github.com/antithesishq/aardvark-arena/internal"
 	"github.com/antithesishq/aardvark-arena/internal/game"
 	"github.com/antithesishq/antithesis-sdk-go/assert"
+
 	"github.com/google/uuid"
 )
 
@@ -26,9 +27,6 @@ type Config struct {
 	// How frequently will the database be checked for expired sessions
 	SessionMonitorInterval time.Duration
 
-	// GameServers is the list of available game server URLs to route to.
-	GameServers []*url.URL
-
 	// Token authenticates requests to/from game servers.
 	Token internal.Token
 
@@ -41,6 +39,7 @@ type Server struct {
 	cfg   Config
 	mux   *http.ServeMux
 	queue *MatchQueue
+	fleet *Fleet
 	db    *DB
 }
 
@@ -51,11 +50,12 @@ func New(ctx context.Context, cfg Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	fleet := NewFleet(cfg.GameServers, cfg.Token, cfg.SessionTimeout)
+	fleet := NewFleet(cfg.Token, cfg.SessionTimeout)
 	s := &Server{
 		cfg:   cfg,
 		mux:   http.NewServeMux(),
 		queue: NewMatchQueue(fleet, db),
+		fleet: fleet,
 		db:    db,
 	}
 	s.routes()
@@ -77,6 +77,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /leaderboard", s.handleLeaderboard)
 	s.mux.HandleFunc("DELETE /session/{sid}", s.handleCancelSession)
 	s.mux.HandleFunc("GET /servers", s.handleServers)
+	s.mux.HandleFunc("POST /servers/register", internal.TokenAuth(s.cfg.Token, s.handleRegister))
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
@@ -99,10 +100,6 @@ func (s *Server) handleQueue(w http.ResponseWriter, r *http.Request) {
 		internal.WriteError(w, http.StatusBadRequest, err)
 		return
 	}
-	assert.Sometimes(body.Game != nil,
-		"players sometimes request a specific game kind",
-		nil,
-	)
 	player, err := s.db.GetOrCreatePlayer(pid)
 	if err != nil {
 		internal.WriteError(w, http.StatusInternalServerError, err)
@@ -114,18 +111,10 @@ func (s *Server) handleQueue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if info == nil {
-		assert.Sometimes(true,
-			"queue requests sometimes wait before a session is assigned",
-			nil,
-		)
 		w.WriteHeader(http.StatusAccepted)
 		_, _ = w.Write([]byte("queued"))
 		return
 	}
-	assert.Sometimes(true,
-		"queue requests sometimes return an immediate session assignment",
-		map[string]any{"game": string(info.Game)},
-	)
 	_ = internal.RespondJSON(w, info)
 }
 
@@ -229,11 +218,38 @@ func (s *Server) handleCancelSession(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleServers(w http.ResponseWriter, _ *http.Request) {
-	urls := make([]string, len(s.cfg.GameServers))
-	for i, u := range s.cfg.GameServers {
-		urls[i] = u.String()
+	_ = internal.RespondJSON(w, s.fleet.Servers())
+}
+
+// RegisterRequest is the JSON body for POST /servers/register.
+type RegisterRequest struct {
+	ID  string `json:"id"`
+	URL string `json:"url"`
+}
+
+func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
+	body, err := internal.BindJSON[RegisterRequest](r.Body)
+	if err != nil {
+		internal.WriteError(w, http.StatusBadRequest, err)
+		return
 	}
-	_ = internal.RespondJSON(w, urls)
+	if body.ID == "" || body.URL == "" {
+		internal.WriteError(w, http.StatusBadRequest, fmt.Errorf("id and url are required"))
+		return
+	}
+	id, err := uuid.Parse(body.ID)
+	if err != nil {
+		internal.WriteError(w, http.StatusBadRequest, fmt.Errorf("invalid id: %w", err))
+		return
+	}
+	u, err := url.Parse(body.URL)
+	if err != nil {
+		internal.WriteError(w, http.StatusBadRequest, fmt.Errorf("invalid url: %w", err))
+		return
+	}
+	s.fleet.Register(id, *u)
+	log.Printf("registered game server %s at %s", internal.ShortID(id), body.URL)
+	_, _ = w.Write([]byte("ok"))
 }
 
 func (s *Server) handleLeaderboard(w http.ResponseWriter, _ *http.Request) {

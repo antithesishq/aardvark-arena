@@ -90,6 +90,22 @@ const (
 // AllGames lists every supported game kind.
 var AllGames = [...]Kind{Battleship, TicTacToe, Connect4}
 
+// EstimatedMoves returns the approximate average number of total moves
+// (across both players) in a typical game of this kind. This is used to
+// scale per-move delay so that games take a target wall-clock duration.
+func (k Kind) EstimatedMoves() int {
+	switch k {
+	case TicTacToe:
+		return 7 // 3x3 board; games last 5-9 moves
+	case Connect4:
+		return 20 // 7x6 board; wins typically around 15-25 moves
+	case Battleship:
+		return 60 // 2 setup + ~58 attack moves (17 hits needed out of 100 cells)
+	default:
+		return 10
+	}
+}
+
 // MarshalText implements encoding.TextMarshaler.
 func (k Kind) MarshalText() ([]byte, error) {
 	return []byte(k), nil

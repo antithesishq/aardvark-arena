@@ -24,11 +24,19 @@ func (e ErrMaxSessions) Error() string {
 	return "max session reached"
 }
 
+// ErrNotActive is returned when the server is not active and cannot accept new sessions.
+type ErrNotActive struct{}
+
+func (e ErrNotActive) Error() string {
+	return "server is not active"
+}
+
 // SessionManager manages active game sessions.
 type SessionManager struct {
-	// mu protects reads/writes to the sessions map
+	// mu protects reads/writes to the sessions map and active flag
 	mu       sync.Mutex
 	sessions map[internal.SessionID]sessionHandle
+	active   bool
 	resultCh chan resultMsg
 	cfg      Config
 
@@ -42,6 +50,7 @@ type SessionManager struct {
 func NewSessionManager(cfg Config, resultCh chan resultMsg) *SessionManager {
 	return &SessionManager{
 		sessions:   make(map[internal.SessionID]sessionHandle),
+		active:     true,
 		resultCh:   resultCh,
 		cfg:        cfg,
 		watchers:   make(map[chan WatchEvent]struct{}),
@@ -56,11 +65,31 @@ func (s *SessionManager) ActiveSessions() int {
 	return len(s.sessions)
 }
 
+// SetActive sets whether the server is accepting new sessions and broadcasts
+// the updated health to all watchers.
+func (s *SessionManager) SetActive(active bool) {
+	s.mu.Lock()
+	s.active = active
+	s.mu.Unlock()
+	s.broadcastHealth()
+}
+
+// IsActive returns whether the server is accepting new sessions.
+func (s *SessionManager) IsActive() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.active
+}
+
 // CreateSession idempotently creates a session, returning an error if the
 // session is finished or the requested game is incorrect.
 func (s *SessionManager) CreateSession(sid internal.SessionID, game game.Kind, deadline time.Time) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if !s.active {
+		return &ErrNotActive{}
+	}
 
 	if _, ok := s.sessions[sid]; !ok {
 		if len(s.sessions) >= s.cfg.MaxSessions {
@@ -264,6 +293,17 @@ func (h *sessionHandle) Join(pid internal.PlayerID, conn *websocket.Conn) {
 	}()
 }
 
+// CancelAllSessions cancels every active session on this server.
+func (s *SessionManager) CancelAllSessions() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, handle := range s.sessions {
+		if !handle.IsFinished() {
+			handle.cancel()
+		}
+	}
+}
+
 // CancelSession cancels a session by its ID.
 func (s *SessionManager) CancelSession(sid internal.SessionID) error {
 	s.mu.Lock()
@@ -356,6 +396,7 @@ func (s *SessionManager) healthEvent() WatchEvent {
 		Type:           WatchEventHealth,
 		ActiveSessions: len(s.sessions),
 		MaxSessions:    s.cfg.MaxSessions,
+		Active:         s.active,
 	}
 }
 

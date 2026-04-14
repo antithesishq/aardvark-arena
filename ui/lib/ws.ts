@@ -5,7 +5,7 @@ export interface GameState {
 }
 
 export type WatchEvent =
-  | { type: "health"; active_sessions: number; max_sessions: number }
+  | { type: "health"; active_sessions: number; max_sessions: number; active: boolean }
   | {
       type: "session";
       session_id: string;

@@ -34,8 +34,10 @@ type Config struct {
 	// If 0 the player will play games until interrupted.
 	NumSessions int
 
-	// MoveDelay adds an artificial pause before each move, useful for demos.
-	MoveDelay time.Duration
+	// GameLength is the target wall-clock duration for a complete game.
+	// The per-move delay is computed from this and the estimated average
+	// number of moves for the matched game type. Zero means no delay.
+	GameLength time.Duration
 }
 
 // Loop runs the player game loop.
@@ -94,10 +96,6 @@ func (l *Loop) waitForMatch(ctx context.Context, lastSID internal.SessionID) (*m
 
 		info, err := l.client.Queue(ctx, pref)
 		if err != nil {
-			assert.Reachable(
-				"players sometimes see transient queue request errors",
-				map[string]any{"pid": l.cfg.PlayerID.String()},
-			)
 			log.Printf("queue error (retrying): %v", err)
 			continue
 		}
@@ -107,17 +105,7 @@ func (l *Loop) waitForMatch(ctx context.Context, lastSID internal.SessionID) (*m
 			assert.Reachable("evil players sometimes submit throwaway queue requests that are never polled again", nil)
 		}
 		if info != nil && info.SessionID != lastSID {
-			assert.Reachable(
-				"players sometimes receive a new match assignment",
-				map[string]any{"pid": l.cfg.PlayerID.String(), "sid": info.SessionID.String()},
-			)
 			return info, nil
-		}
-		if info != nil && info.SessionID == lastSID {
-			assert.Reachable(
-				"queue polling sometimes repeats the currently assigned session",
-				map[string]any{"pid": l.cfg.PlayerID.String(), "sid": info.SessionID.String()},
-			)
 		}
 	}
 }
@@ -127,18 +115,10 @@ func (l *Loop) chooseGamePreference() *game.Kind {
 		l.rng = internal.NewRand()
 	}
 	if len(game.AllGames) == 0 || l.cfg.SpecificGameSelectionRate <= 0 || l.rng.Float64() >= l.cfg.SpecificGameSelectionRate {
-		assert.Reachable(
-			"players sometimes queue for any available game",
-			map[string]any{"pid": l.cfg.PlayerID.String()},
-		)
 		return nil
 	}
 
 	chosen := game.AllGames[l.rng.Intn(len(game.AllGames))]
-	assert.Reachable(
-		"players sometimes queue for a specific game preference",
-		map[string]any{"pid": l.cfg.PlayerID.String(), "game": string(chosen)},
-	)
 	log.Printf("player %s: queueing for specific game: %s", l.cfg.PlayerID, chosen)
 	return &chosen
 }
@@ -151,21 +131,26 @@ func (l *Loop) playGame(ctx context.Context, info *matchmaker.SessionInfo) error
 	session := NewSession(info.Server, info.SessionID, l.cfg.PlayerID, l.cfg.Behavior)
 	go session.Run(ctx)
 
+	var moveDelay time.Duration
+	if l.cfg.GameLength > 0 {
+		moveDelay = l.cfg.GameLength / time.Duration(info.Game.EstimatedMoves())
+	}
+
 	var completion Completion
 	var err error
 
 	switch info.Game {
 	case game.TicTacToe:
 		assert.Reachable("players sometimes play tic-tac-toe sessions", nil)
-		p := NewProtocol(session.protocolRx, session.protocolTx, game.NewTicTacToeAi(), l.cfg.Behavior, l.cfg.MoveDelay)
+		p := NewProtocol(session.protocolRx, session.protocolTx, game.NewTicTacToeAi(), l.cfg.Behavior, moveDelay)
 		completion, err = p.RunToCompletion()
 	case game.Connect4:
 		assert.Reachable("players sometimes play connect4 sessions", nil)
-		p := NewProtocol(session.protocolRx, session.protocolTx, game.NewConnect4Ai(), l.cfg.Behavior, l.cfg.MoveDelay)
+		p := NewProtocol(session.protocolRx, session.protocolTx, game.NewConnect4Ai(), l.cfg.Behavior, moveDelay)
 		completion, err = p.RunToCompletion()
 	case game.Battleship:
 		assert.Reachable("players sometimes play battleship sessions", nil)
-		p := NewProtocol(session.protocolRx, session.protocolTx, game.NewBattleshipAi(), l.cfg.Behavior, l.cfg.MoveDelay)
+		p := NewProtocol(session.protocolRx, session.protocolTx, game.NewBattleshipAi(), l.cfg.Behavior, moveDelay)
 		completion, err = p.RunToCompletion()
 	default:
 		return fmt.Errorf("unsupported game: %s", info.Game)

@@ -27,7 +27,7 @@ func main() {
 	var numPlayers = flag.Int("n", 7, "number of players to run")
 	var numSessions = flag.Int("num-sessions", 0, "number of sessions per player before exiting (0 = indefinite)")
 	var pollInterval = flag.Duration("poll-interval", DefaultPollInterval, "duration between polling the matchmaker queue")
-	var moveDelay = flag.Duration("move-delay", 0, "artificial delay before each move (e.g. 500ms, 1s)")
+	var gameLength = flag.Duration("game-length", 0, "target game duration (e.g. 30s, 1m); per-move delay is computed automatically")
 	var evil = flag.Bool("evil", false, "enable probabilistic malicious behavior")
 	var evilChaosRate = flag.Float64("evil-chaos-rate", 0.30, "probability [0,1] of sending a bad move instead of a valid move")
 	var evilOutOfTurnRate = flag.Float64("evil-out-of-turn-rate", 0.10, "probability [0,1] of sending a nuisance move out of turn")
@@ -54,7 +54,7 @@ func main() {
 			PlayerID:                 uuid.New(),
 			NumSessions:              *numSessions,
 			PollInterval:             *pollInterval,
-			MoveDelay:                *moveDelay,
+			GameLength:               *gameLength,
 			SpecificGameSelectionRate: player.DefaultSpecificGameSelectionRate,
 			Behavior: player.Behavior{
 				Evil:             *evil,
