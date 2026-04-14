@@ -119,6 +119,83 @@ const gameServerNavPoint = extract((state) => {
   return null;
 });
 
+// --- Nested scroll detection ---
+
+// Recursively walk the DOM to find elements that are independently scrollable
+// (overflow auto/scroll with content that actually overflows). For each one,
+// build a minimal selector, grab its bounding rect, and record whether it is
+// nested inside another scrollable container.
+const nestedScrollables = extract((state) => {
+  const scrollables: {
+    selector: string;
+    tag: string;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    nested: boolean;
+  }[] = [];
+
+  function minimalSelector(el: Element): string {
+    if (el.id) return `#${el.id}`;
+    const testId = el.getAttribute("data-testid");
+    if (testId) return `[data-testid='${testId}']`;
+    const tag = el.tagName.toLowerCase();
+    const cls = el.className;
+    if (cls && typeof cls === "string") {
+      const first = cls.trim().split(/\s+/)[0];
+      if (first) return `${tag}.${first}`;
+    }
+    const parent = el.parentElement;
+    if (!parent) return tag;
+    const siblings = Array.from(parent.children).filter(
+      (c) => c.tagName === el.tagName,
+    );
+    if (siblings.length === 1) return `${minimalSelector(parent)} > ${tag}`;
+    const idx = siblings.indexOf(el);
+    return `${minimalSelector(parent)} > ${tag}:nth-child(${idx + 1})`;
+  }
+
+  function isScrollable(el: Element): boolean {
+    const style = state.window.getComputedStyle(el);
+    const ov = (v: string) => v === "auto" || v === "scroll";
+    return (
+      (ov(style.overflowY) && el.scrollHeight > el.clientHeight) ||
+      (ov(style.overflowX) && el.scrollWidth > el.clientWidth)
+    );
+  }
+
+  // The viewport scrolls when the document is taller/wider than the window,
+  // even though html/body often have overflow: visible (the browser handles
+  // viewport scroll specially). Detect this so inner scroll containers are
+  // correctly flagged as nested.
+  const pageScrolls =
+    state.document.documentElement.scrollHeight > state.window.innerHeight ||
+    state.document.documentElement.scrollWidth > state.window.innerWidth;
+
+  function walk(el: Element, insideScrollable: boolean) {
+    const scrollable = isScrollable(el);
+    if (scrollable) {
+      const r = el.getBoundingClientRect();
+      scrollables.push({
+        selector: minimalSelector(el),
+        tag: el.tagName.toLowerCase(),
+        x: Math.round(r.left),
+        y: Math.round(r.top),
+        w: Math.round(r.width),
+        h: Math.round(r.height),
+        nested: insideScrollable,
+      });
+    }
+    for (const child of Array.from(el.children)) {
+      walk(child, insideScrollable || scrollable);
+    }
+  }
+
+  walk(state.document.documentElement, pageScrolls);
+  return scrollables;
+});
+
 // True until the page shell has rendered (nav visible). We don't wait for
 // data — the backend may be unreachable in some environments, and we still
 // want to exercise navigation and check the no-error-code properties.
@@ -157,6 +234,14 @@ export const winnerShownThenDisappears = always(() => {
   if (!id) return true;
   // The extractor already confirmed the winner text is visible; assert cleanup.
   return eventually(() => !gameCardIds.current.includes(id)).within(10, "seconds");
+});
+
+// Property 3 – No nested scrollable containers.
+//
+// A scrollable element inside another scrollable element creates a confusing
+// UX (scroll-jacking, trapped pointer, etc.). This should never occur.
+export const noNestedScrolling = always(() => {
+  return nestedScrollables.current.every((s) => !s.nested);
 });
 
 // ============================================================
