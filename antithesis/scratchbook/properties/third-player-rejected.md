@@ -1,28 +1,36 @@
-# third-player-rejected
+# third-player-rejected — Excess Connections Are Rejected
 
 ## Evidence
 
-In `protocol.handleConn` (`internal/gameserver/protocol.go:171-213`):
-- If `pid` is already in `p.players`, it's a reconnection (handled above)
-- If `len(p.players) == 0`, assigned P1
-- If `len(p.players) == 1`, assigned P2
-- `else` (len >= 2 and pid not in players): error sent, player not added
+`handleConn` (`internal/gameserver/protocol.go:170-204`) handles player connections:
 
 ```go
+if existing, ok := p.players[pid]; ok {
+    // reconnection — replace existing
+} else if len(p.players) == 0 {
+    // first player → P1
+} else if len(p.players) == 1 {
+    // second player → P2
 } else {
-    assert.Reachable("extra player connections are sometimes rejected", ...)
     conn <- PlayerMsg{Error: "too many players connected"}
 }
 ```
 
-Note: the error is sent but the connection channel is not closed in this branch. The caller (`sessionHandle.Join` at `session.go:230-265`) sets up read/write goroutines regardless. The write goroutine will drain `stateCh` (which has the error) and close the websocket. The read goroutine will exit when the websocket closes.
+A third unique player ID gets an error message on their channel. The channel is not added to `p.players`, and the connection's write goroutine (spawned in `Join`) will deliver the error and then the channel will be garbage collected.
 
-## Code Paths
+The evil player mode includes `runExtraConnectChaos` (`internal/player/session.go:80-105`) which periodically connects with random player IDs. These probe connections are closed quickly after connecting.
 
-- `protocol.handleConn` — `protocol.go:171-213`
-- `sessionHandle.Join` — `session.go:229-265` — sets up goroutines after sending to inbox
-- Evil player extra-connect chaos — `session.go:81-110` — sends random-ID connections
+## Failure Scenario
 
-## Instrumentation Status
+The error is sent on the `conn` channel but the channel is never closed by the Protocol. The write goroutine in `Join` (`session.go:231-239`) ranges over `stateCh`, so it would block forever waiting for more messages. However, the goroutine also writes to the websocket — if the websocket is closed by the client (as evil players do immediately), the write goroutine exits on the websocket error.
 
-**PARTIALLY COVERED** — R10 confirms the rejection path is reached. No `Always(len(p.players) <= 2)` exists as a persistent invariant check.
+The dangling goroutine would only be a problem if the evil player keeps the websocket open indefinitely. In practice, evil players close quickly (`chaos join probe`).
+
+## Relevant Code Paths
+- `internal/gameserver/protocol.go:170-204` — `handleConn` third-player rejection
+- `internal/gameserver/session.go:220-256` — `Join` spawns goroutines for the connection
+- `internal/player/session.go:80-105` — `runExtraConnectChaos`
+
+## SUT Instrumentation
+- **Missing**: `Always` assertion that when `len(p.players) >= 2` and a new unknown pid arrives, the pid is NOT added to `p.players`.
+- **Missing**: `Reachable` assertion on the "too many players" path to confirm evil players exercise it.

@@ -1,75 +1,89 @@
 # Evaluation Synthesis
 
-## Refinements (Applied)
+## Categorized Findings
 
-### R1: Elevate `no-duplicate-result-application` to highest priority
-**Source:** Antithesis Fit, Coverage Balance
-**Finding:** This property sits at the intersection of timing, network faults, and data integrity — Antithesis's sweet spot. It also has cross-cutting impact on all ELO properties. The Coverage Balance lens flagged its priority as too low.
-**Action:** Updated priority framing in catalog. This property also requires a code fix (idempotency check), not just an assertion.
+### Refinements (apply directly)
 
-### R2: Downgrade `queue-fifo-ordering` to low priority
-**Source:** Antithesis Fit
-**Finding:** FIFO ordering is a deterministic sort correctness check, better verified by unit tests. Antithesis fault injection doesn't add value.
-**Action:** Noted in catalog. Keep for completeness but deprioritize in implementation.
+**R1: Downgrade game rule cluster priority** (Antithesis Fit F1)
+Properties: `game-rules-enforced`, `turn-order-maintained`, `board-state-valid`, `correct-winner-detection`
+Action: Keep as lightweight `Always` assertions for defense-in-depth. Note in catalog that these are low Antithesis-value due to single-goroutine protocol design. The real value is catching serialization or state corruption bugs, not concurrency issues.
 
-### R3: Downgrade `elo-conservation` to low priority for Antithesis
-**Source:** Antithesis Fit
-**Finding:** Mathematical property of the formula, not timing/concurrency-sensitive. Better verified by property-based unit testing.
-**Action:** Noted in catalog. Still worth adding as a SUT-side assertion for defense-in-depth.
+**R2: Fix `max-sessions-reached` feasibility** (Implementability F11)
+Property: `max-sessions-reached`
+Action: Update deployment topology to set `MaxSessions=6` so the 7-player swarm can actually hit capacity.
 
-### R4: Note `invalid-moves-never-change-state` implementation complexity
-**Source:** Implementability
-**Finding:** Deep-equality comparison adds complexity for marginal value. The Go value semantics guarantee this at the language level.
-**Action:** Keep in catalog at medium priority but note that implementation may not justify the effort.
+**R3: Strengthen `player-sees-terminal-state`** (Wildcard F4)
+Property: `player-sees-terminal-state`
+Action: Change from `Sometimes` to `AlwaysOrUnreachable` — when a player is connected at game end, they must receive the terminal state.
 
-## Gaps (Filled)
+**R4: Fix dominance claim** (Wildcard F8)
+Action: Correct property-relationships.md to remove the claim that `game-rules-enforced` dominates `board-state-valid`. They cover different failure classes (mutation bugs vs serialization bugs).
 
-### G1: Game-specific invariants
-**Source:** Coverage Balance
-**Finding:** Zero properties for game logic correctness. TicTacToe, Connect4, and Battleship have distinct rules that aren't verified.
-**Action:** Added two gap-fill properties to the catalog:
-- `game-winner-has-winning-condition` — when a game ends with a winner, the game board shows a valid winning condition
-- `player-eventually-matched` — queued players eventually receive a match assignment
+**R5: Clarify `draw-outcome-reached` scope** (Wildcard F7)
+Property: `draw-outcome-reached`
+Action: Clarify in catalog that this applies to TicTacToe and Connect4 only. Add note that Battleship draws are impossible by game rules.
 
-### G2: Queued-player liveness
-**Source:** Coverage Balance
-**Finding:** No property verifies that queued players eventually get matched.
-**Action:** Added `player-eventually-matched` property.
+**R6: Note `correct-winner-detection` Battleship limitation** (Implementability F2)
+Property: `correct-winner-detection`
+Action: Note in catalog that Battleship winner verification requires SUT-side assertion (private `shipCells` state not visible to workload).
 
-### G3: Orphaned session cleanup
-**Source:** Wildcard
-**Finding:** Sessions created on game servers but abandoned by matchmaking are not verified to be cleaned up.
-**Action:** Documented in wildcard findings. This is addressed by existing `session-deadline-enforced` property — orphaned sessions will timeout. Added note to that property's evidence file.
+**R7: Note `no-double-elo-update` is a known code deficiency** (Antithesis Fit F4)
+Property: `no-double-elo-update`
+Action: Add note that this property will likely fail immediately due to missing idempotency guard. This is intentional — validates that Antithesis can find this class of bug.
 
-### G4: `sendLatest` player state drops
-**Source:** Wildcard
-**Finding:** The `sendLatest` function can drop player state updates under contention, but this is acceptable for the system's design (players poll and the latest state is sufficient).
-**Action:** Documented as a design observation, not a property gap. The protocol is designed for "latest state wins" semantics.
+### Gaps (fill via targeted discovery)
 
-## Biases
+**G1: No global ELO conservation property** (Coverage Balance F1, Wildcard F1)
+Multiple lenses flagged that per-transaction zero-sum doesn't catch cumulative drift from double-updates.
+Action: Add `elo-global-conservation` property.
 
-### B1: Safety-heavy catalog
-**Observation:** 10 safety properties vs 5 liveness properties. The catalog is oriented toward "bad things never happen" rather than "good things eventually happen."
-**Assessment:** This is appropriate for this system. The primary risks are data corruption (ELO, session results) and state inconsistency, which are safety concerns. The liveness properties (`game-terminates`, `result-reported-for-every-session`, `fleet-recovery-after-backoff`, `services-recover-to-healthy`, `post-fault-game-completion`) adequately cover the progress guarantees. No action needed.
+**G2: No matchmaker restart recovery property** (Coverage Balance F2, Wildcard F5)
+In-memory state lost on restart while SQLite persists. Players stuck in limbo.
+Action: Add `player-recovers-after-matchmaker-restart` liveness property.
 
-### B2: Matchmaker-centric analysis
-**Observation:** The matchmaker has the most properties (8) because it holds the most state (SQLite DB, queue, matched map). The game server has 7 properties. The game logic implementations have very few.
-**Assessment:** This reflects the actual risk distribution — the matchmaker is the single point of failure and the source of persistent state. Adding game-specific properties (G1 above) partially addresses this. Presented to user for awareness.
+**G3: No spectator workload component** (Coverage Balance F3, Implementability U3, Wildcard F12)
+`spectator-state-consistency` requires a spectator client that doesn't exist in the workload.
+Action: Add spectator test command to deployment topology. Lower priority since spectating is read-only.
 
-## Summary
+**G4: No result channel backpressure property** (Antithesis Fit F2, Wildcard F6)
+Protocol goroutine can deadlock if `resultCh` fills.
+Action: Add `protocol-not-blocked` safety property.
 
-| Category | Count | Action |
-|----------|-------|--------|
-| Refinements | 4 | Applied to catalog |
-| Gaps | 4 | 2 filled with new properties, 2 documented as design observations |
-| Biases | 2 | Assessed as appropriate, presented for awareness |
+**G5: Ghost queue entries from evil players** (Wildcard F3)
+Evil player `QueueAbandonRate` creates phantom queue entries that get matched to real sessions.
+Action: Add `ghost-player-sessions-cleaned-up` liveness property.
 
-## Final Property Count
+**G6: No health/crash recovery property** (Coverage Balance F5, Wildcard F11)
+Panic paths crash the matchmaker. No property verifies restart.
+Action: Add `services-remain-healthy` liveness property.
 
-After gap-filling: **27 properties** (25 original + 2 gap-fill)
-- Safety: 14 (Always, AlwaysOrUnreachable, Unreachable)
-- Liveness: 6 (Sometimes)
-- Reachability: 3 (Reachable)
-- Already fully covered by existing assertions: 10 (no new instrumentation needed)
-- Needing new SUT-side assertions: 13
-- Needing code changes beyond assertions: 2 (`no-duplicate-result-application`, `no-completed-session-expires`)
+**G7: Leaderboard validation not in catalog** (Coverage Balance F6)
+Test command exists but no property.
+Action: Add `leaderboard-reflects-games` safety property (subsumes G1).
+
+### Biases (escalate to user)
+
+**B1: Single game server topology limits fleet failover testing** (Implementability F6)
+The deployment topology has one game server. The `fleet-failover` property exists but the "skip server, try next" path is never exercised — only retry-backoff entry/exit. Adding a second game server container would increase state space but enable fuller fleet testing.
+
+Question for user: Should we add a second game server container to the deployment topology? This trades Antithesis exploration efficiency for fleet failover coverage.
+
+## Actions Taken
+
+### Refinements Applied
+
+All refinements (R1-R7) have been applied to the property catalog, evidence files, and property relationships.
+
+### Gaps Filled
+
+Added 5 new properties to the catalog:
+
+1. **`leaderboard-reflects-games`** — Safety: Sum of all player ELOs equals `count(players) * DefaultElo`. Subsumes G1 and G7.
+2. **`player-recovers-after-matchmaker-restart`** — Liveness: After matchmaker restart, players can re-queue and get matched. (G2, G6)
+3. **`protocol-not-blocked`** — Safety: The protocol goroutine's select loop processes timer events within bounded time. (G4)
+4. **`ghost-player-sessions-cleaned-up`** — Liveness: Sessions created for ghost queue entries are eventually cancelled. (G5)
+5. **`spectator-receives-valid-state`** — Moved from workload-side to SUT-side assertion to remove dependency on spectator workload client. (G3)
+
+### Biases Escalated
+
+B1 escalated above. Recommendation: keep single game server for initial Antithesis runs. The fleet retry-backoff path is still exercised when Antithesis injects network faults between matchmaker and game server. Add a second game server in a follow-up if fleet bugs are a concern.
