@@ -9,6 +9,7 @@ import (
 
 	"github.com/antithesishq/aardvark-arena/internal"
 	"github.com/antithesishq/aardvark-arena/internal/game"
+	"github.com/google/uuid"
 )
 
 func TestFleetSanity(t *testing.T) {
@@ -22,7 +23,8 @@ func TestFleetSanity(t *testing.T) {
 		defer srv.Close()
 
 		u, _ := url.Parse(srv.URL)
-		fleet := NewFleet([]*url.URL{u}, internal.NilToken, 5*time.Minute)
+		fleet := NewFleet(internal.NilToken, 5*time.Minute)
+		fleet.Register(uuid.New(), *u)
 
 		info, err := fleet.CreateSession(game.TicTacToe)
 		if err != nil {
@@ -51,7 +53,9 @@ func TestFleetSanity(t *testing.T) {
 		u, _ := url.Parse(srv.URL)
 		// Two entries pointing at the same test server so the fleet has a
 		// second candidate after the first returns 503.
-		fleet := NewFleet([]*url.URL{u, u}, internal.NilToken, 5*time.Minute)
+		fleet := NewFleet(internal.NilToken, 5*time.Minute)
+		fleet.Register(uuid.New(), *u)
+		fleet.Register(uuid.New(), *u)
 
 		info, err := fleet.CreateSession(game.TicTacToe)
 		if err != nil {
@@ -69,7 +73,8 @@ func TestFleetSanity(t *testing.T) {
 		defer srv.Close()
 
 		u, _ := url.Parse(srv.URL)
-		fleet := NewFleet([]*url.URL{u}, internal.NilToken, 5*time.Minute)
+		fleet := NewFleet(internal.NilToken, 5*time.Minute)
+		fleet.Register(uuid.New(), *u)
 
 		_, err := fleet.CreateSession(game.TicTacToe)
 		if err != ErrNoServersAvailable {
@@ -77,12 +82,39 @@ func TestFleetSanity(t *testing.T) {
 		}
 	})
 
-	t.Run("no servers configured", func(t *testing.T) {
-		fleet := NewFleet(nil, internal.NilToken, 5*time.Minute)
+	t.Run("no servers registered", func(t *testing.T) {
+		fleet := NewFleet(internal.NilToken, 5*time.Minute)
 
 		_, err := fleet.CreateSession(game.TicTacToe)
 		if err != ErrNoServersAvailable {
 			t.Fatalf("expected ErrNoServersAvailable, got %v", err)
+		}
+	})
+
+	t.Run("ResetRetry clears retryAt", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusServiceUnavailable)
+		}))
+		defer srv.Close()
+
+		u, _ := url.Parse(srv.URL)
+		id := uuid.New()
+		fleet := NewFleet(internal.NilToken, 5*time.Minute)
+		fleet.Register(id, *u)
+
+		// Drive the server into retryAt by getting a 503.
+		_, err := fleet.CreateSession(game.TicTacToe)
+		if err != ErrNoServersAvailable {
+			t.Fatalf("expected ErrNoServersAvailable, got %v", err)
+		}
+		if fleet.servers[0].retryAt == nil {
+			t.Fatal("expected retryAt to be set after 503")
+		}
+
+		// Reset and verify the server is available again.
+		fleet.ResetRetry(id)
+		if fleet.servers[0].retryAt != nil {
+			t.Fatal("expected retryAt to be nil after ResetRetry")
 		}
 	})
 }

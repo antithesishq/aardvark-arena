@@ -12,6 +12,12 @@ const silkscreen = Silkscreen({ subsets: ["latin"], weight: "400", variable: "--
 export const metadata: Metadata = {
   title: "Aardvark Arena",
   description: "Live dashboard for the Aardvark Arena distributed game system",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
+    ],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -21,7 +27,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`dark h-full antialiased ${geist.variable} ${geistMono.variable} ${silkscreen.variable}`}
       style={{ fontFamily: "var(--font-geist), ui-sans-serif, system-ui, sans-serif" }}
     >
-      <body className="min-h-full flex flex-col bg-zinc-950 text-zinc-100">
+      {/* suppressHydrationWarning: browser extensions (e.g. Grammarly) inject attrs on <body> */}
+      <body suppressHydrationWarning className="min-h-full flex flex-col bg-zinc-950 text-zinc-100">
         {/* Top bar */}
         <header className="sticky top-0 z-50 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur-sm">
           <div className="max-w-7xl mx-auto flex items-center gap-8 h-12 px-6">

@@ -14,4 +14,3 @@ Go project for educational purposes. Keep code simple and clean.
 - Next.js + React + TypeScript + Tailwind + shadcn/ui
 - `cd ui && npm install && npm run dev` — start dev server
 - `cd ui && npm run build` — production build
-- Bombadil spec: `ui/bombadil-spec.ts` — property-based UI tests

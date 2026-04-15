@@ -1,11 +1,17 @@
-# all-game-types-played
+# all-game-types-played — All Three Game Types Are Exercised
 
 ## Evidence
 
-Player game selection happens in `chooseGamePreference` (`internal/player/loop.go:125-144`). With `SpecificGameSelectionRate = 0.20`, ~20% of queue requests specify a game; the rest accept any game. When no preference is specified, `selectMatchGame` (`match_queue.go:138-156`) picks randomly from `game.AllGames` (Battleship, TicTacToe, Connect4).
+Game selection happens in two places:
+1. **Player preference** (`internal/player/loop.go:109-120`): 20% chance of selecting a specific game. Games chosen uniformly from `game.AllGames` (Battleship, TicTacToe, Connect4).
+2. **Match queue** (`internal/matchmaker/match_queue.go:134-152`): If both players have no preference, a random game is selected from `game.AllGames`.
 
-Three `Reachable` assertions (R21, R22, R23) confirm each game type is played.
+With 80% "any game" rate and 20% specific-game rate spread across 3 games, all three types should be exercised.
 
-## Instrumentation Status
+## Relevant Code Paths
+- `internal/player/loop.go:109-120` — `chooseGamePreference`
+- `internal/matchmaker/match_queue.go:134-152` — `selectMatchGame`
+- `internal/game/game.go:91` — `AllGames` array
 
-**FULLY COVERED** — R21, R22, R23 cover all three game types.
+## SUT Instrumentation
+- **Missing**: Three `Reachable` assertions — one per game type — in `SessionManager.CreateSession` or `sessionHandle.RunToCompletion`.

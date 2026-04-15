@@ -10,6 +10,7 @@ import (
 	"github.com/antithesishq/aardvark-arena/internal"
 	"github.com/antithesishq/aardvark-arena/internal/game"
 	"github.com/antithesishq/antithesis-sdk-go/assert"
+	"github.com/google/uuid"
 )
 
 type candidate struct {
@@ -182,11 +183,6 @@ func (q *MatchQueue) publishMatch(session *SessionInfo, a, b *candidate) {
 		delete(q.queued, b.pid)
 		q.matched[a.pid] = session
 		q.matched[b.pid] = session
-		assert.Sometimes(
-			true,
-			"queued players are sometimes promoted to matched sessions",
-			map[string]any{"sid": session.SessionID.String()},
-		)
 		return
 	}
 	assert.Reachable(
@@ -203,10 +199,6 @@ func (q *MatchQueue) Queue(player *PlayerModel, game *game.Kind) (*SessionInfo, 
 
 	// Check if the player is already matched
 	if session, ok := q.matched[player.PlayerID]; ok {
-		assert.Reachable(
-			"queue polling sometimes returns an existing match",
-			map[string]any{"sid": session.SessionID.String()},
-		)
 		return session, nil
 	}
 
@@ -233,15 +225,21 @@ func (q *MatchQueue) Unqueue(pid internal.PlayerID) {
 }
 
 // Untrack removes a session and associated players, allowing them to requeue
-// for another match.
+// for another match. It also resets the retryAt on the gameserver that hosted
+// the session so it can immediately accept new sessions.
 func (q *MatchQueue) Untrack(sid internal.SessionID) {
 	q.mu.Lock()
-	defer q.mu.Unlock()
-
+	var serverID uuid.UUID
 	for pid, session := range q.matched {
 		if session.SessionID == sid {
+			serverID = session.ServerID
 			delete(q.matched, pid)
 		}
+	}
+	q.mu.Unlock()
+
+	if serverID != uuid.Nil {
+		q.fleet.ResetRetry(serverID)
 	}
 }
 

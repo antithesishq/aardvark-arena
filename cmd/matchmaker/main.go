@@ -6,40 +6,33 @@ import (
 	"flag"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
 	"time"
 
 	"github.com/antithesishq/aardvark-arena/internal"
 	"github.com/antithesishq/aardvark-arena/internal/matchmaker"
+
+	"github.com/antithesishq/antithesis-sdk-go/assert"
 )
 
 var DefaultSessionTimeout = 5 * time.Minute
 var DefaultMatchInterval = time.Second
 var DefaultSessionMonitorInterval = 5 * time.Second
-var DefaultGameServer = "http://localhost:8081"
 
 func main() {
 	log.SetOutput(os.Stdout)
 
-	var gameServers internal.URLList
 	addr := flag.String("addr", ":8080", "server listen address")
 	sessionTimeout := flag.Duration("session-timeout", DefaultSessionTimeout, "duration after which unfinished sessions are cancelled")
 	matchInterval := flag.Duration("match-interval", DefaultMatchInterval, "interval between checking the match queue")
 	sessionMonitorInterval := flag.Duration("monitor-interval", DefaultSessionMonitorInterval, "interval between checking for expired sessions")
-	flag.Var(&gameServers, "gameserver", "gameserver URL (can be repeated)")
 	var token internal.Token
 	flag.Var(&token, "token", "token for authenticating gameserver requests")
 	databasePath := flag.String("db-path", ":memory:", "path to the SQLite database")
 	flag.Parse()
 
 	log.Println("starting matchmaker...")
-
-	if len(gameServers) == 0 {
-		defaultURL, _ := url.Parse(DefaultGameServer)
-		gameServers = append(gameServers, defaultURL)
-	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
@@ -48,7 +41,6 @@ func main() {
 		SessionTimeout:         *sessionTimeout,
 		MatchInterval:          *matchInterval,
 		SessionMonitorInterval: *sessionMonitorInterval,
-		GameServers:            gameServers,
 		Token:                  token,
 		DatabasePath:           *databasePath,
 	}
@@ -67,6 +59,8 @@ func main() {
 			log.Printf("shutdown error: %v", err)
 		}
 	}()
+
+	assert.Reachable("matchmaker startup path executed", nil)
 
 	log.Printf("listening on %s", *addr)
 	if err := httpServer.ListenAndServe(); err != http.ErrServerClosed {

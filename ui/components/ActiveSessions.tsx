@@ -32,7 +32,7 @@ function CancelButton({ session, onRefresh }: { session: ActiveSession; onRefres
   return (
     <div className="flex flex-col items-end gap-0.5">
       <Button size="sm" variant="destructive" style={mono} onClick={handleCancel} disabled={cancelling}
-        className={`w-24 ${cancelling ? "opacity-50" : ""}`}>
+        data-testid="cancel-btn" className={`w-24 ${cancelling ? "opacity-50" : ""}`}>
         {cancelling ? "Cancelling…" : "Cancel"}
       </Button>
       {error && <span className="text-[10px] text-red-400" style={mono}>{error}</span>}
@@ -91,7 +91,7 @@ export function ActiveSessions({ sessions, onRefresh }: Props) {
             </tr>
           )}
           {sorted.map((s) => (
-            <tr key={s.session_id} className="border-b border-zinc-800/50 last:border-0">
+            <tr key={s.session_id} data-testid="session-row" data-session-id={s.session_id} className="border-b border-zinc-800/50 last:border-0">
               <td className="py-2.5" style={mono}><span className="text-zinc-400">{shortId4(s.session_id)}</span></td>
               <td className="py-2.5 text-zinc-300" style={geist}>
                 {s.player_ids.map((id) => id.slice(0, 8)).join(" vs ")}

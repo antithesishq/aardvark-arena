@@ -29,6 +29,7 @@ type WatchEvent struct {
 	Deadline  *time.Time         `json:"deadline,omitempty"`
 
 	// health fields
-	ActiveSessions int `json:"active_sessions,omitempty"`
-	MaxSessions    int `json:"max_sessions,omitempty"`
+	ActiveSessions int  `json:"active_sessions,omitempty"`
+	MaxSessions    int  `json:"max_sessions,omitempty"`
+	Active         bool `json:"active"`
 }

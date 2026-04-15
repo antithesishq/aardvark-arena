@@ -45,11 +45,11 @@ type Protocol[Move any, Shared any] struct {
 	inbox  <-chan inboxMsg
 	result chan<- resultMsg
 
-	sid         internal.SessionID
-	deadline    time.Time
-	turnTimeout time.Duration
-	turnTimer   *time.Timer
-	players     map[internal.PlayerID]playerConn
+	sid             internal.SessionID
+	deadline        time.Time
+	turnTimeout     time.Duration
+	turnTimer       *time.Timer
+	players         map[internal.PlayerID]playerConn
 	spectators      []chan PlayerMsg
 	state           game.State[Shared]
 	session         game.Session[Move, Shared]

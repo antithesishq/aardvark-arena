@@ -1,361 +1,362 @@
 ---
-commit: 0db32cd5760f7547845837c4bcd1ebe342a45707
-updated: 2026-04-07
+commit: 273ec77315ab2fc55bda352ca557b57b8c9908c5
+updated: 2026-04-08
 ---
 
-# Property Catalog
+# Property Catalog — Aardvark Arena
 
-## Category: Session Lifecycle Integrity
+## Priority Summary
 
-Properties ensuring game sessions are created, played, and completed correctly.
+Properties ranked by Antithesis value — how much benefit fault injection and interleaving exploration provide beyond what deterministic tests can cover.
 
-### cancelled-session-no-winner — Cancelled Sessions Never Declare a Winner
+| Priority | Properties |
+|----------|-----------|
+| **High** | `no-double-elo-update`, `elo-zero-sum`, `no-elo-change-on-cancel`, `leaderboard-reflects-games`, `protocol-not-blocked`, `player-recovers-after-matchmaker-restart`, `no-duplicate-match`, `player-reconnect-works`, `session-eventually-completes`, `result-reported-to-matchmaker`, `matchmaking-progress` |
+| **Medium** | `session-capacity-enforced`, `expired-sessions-cancelled`, `session-cleanup-complete`, `orphaned-session-handled`, `third-player-rejected`, `player-sees-terminal-state`, `fleet-failover`, `ghost-player-sessions-cleaned-up`, `all-game-types-played`, `turn-timeout-fires`, `evil-move-rejected`, `session-deadline-fires`, `max-sessions-reached` |
+| **Low** | `game-rules-enforced`, `correct-winner-detection`, `turn-order-maintained`, `board-state-valid`, `spectator-receives-valid-state`, `draw-outcome-reached` |
+
+**High**: Timing-sensitive races, concurrent access to shared state, network failure recovery, known code deficiencies. These are the properties where Antithesis provides the most value.
+
+**Medium**: Properties exercising important code paths that benefit from fault injection but have simpler concurrency models or are partially covered by existing tests.
+
+**Low**: Single-goroutine properties kept as defense-in-depth. Their primary Antithesis value is catching unexpected state corruption, not concurrency bugs.
+
+## Game Rule Integrity
+
+Properties ensuring game logic is correct under all conditions. Note: these properties operate on a single-goroutine protocol, so their primary Antithesis value is catching serialization or state corruption bugs rather than concurrency issues. Keep as lightweight defense-in-depth assertions.
+
+### game-rules-enforced — Game Rules Never Violated
 
 | | |
 |---|---|
 | **Type** | Safety |
-| **Property** | If a session is cancelled, the result must have winner == uuid.Nil. |
-| **Invariant** | `Always(!cancelled \|\| winner == uuid.Nil)` — checked at three code points (matchmaker HTTP handler, matchmaker DB layer, gameserver reporter). Already instrumented as A1, A2, A4. The assertion type matches because this is a universal invariant that must hold on every evaluation. |
-| **Antithesis Angle** | Fault injection during the result-reporting path: network partitions between game server and matchmaker, crash of game server mid-report, concurrent session cancellation by the session monitor while a result is in flight. |
-| **Why It Matters** | A cancelled session with a winner would corrupt ELO ratings and game history. |
-| **Existing Coverage** | **FULLY COVERED** — A1, A2, A4 already assert this at all relevant code points. |
+| **Property** | A game session never accepts an invalid move that mutates board state. |
+| **Invariant** | `Always`: After every `MakeMove` call that returns `nil` error, the resulting board state is legal for that game type (e.g., TTT has at most 1 more X than O, Connect4 pieces obey gravity, Battleship ships don't overlap). Assertion placed SUT-side in each game's `MakeMove` implementation. |
+| **Antithesis Angle** | Evil players send malformed, out-of-bounds, and out-of-turn moves under various timing conditions. Antithesis explores interleavings where malicious and valid moves arrive nearly simultaneously. |
+| **Why It Matters** | Invalid board states break win detection and spectator rendering. The evil player mode exercises these paths. |
 
-### session-capacity-respected — Active Sessions Never Exceed Max
+### correct-winner-detection — Winner Matches Board State
+
+| | |
+|---|---|
+| **Type** | Safety |
+| **Property** | When a game transitions to P1Win or P2Win, the board state actually contains a winning configuration for that player. |
+| **Invariant** | `Always`: At each terminal state, verify the declared winner has a winning position (3-in-a-row for TTT, 4-in-a-row for Connect4, all opponent ships sunk for Battleship). SUT-side assertion in Protocol.report(). Note: Battleship winner verification requires SUT-side assertion because private `shipCells` state is not visible to workload clients. |
+| **Antithesis Angle** | Fault injection during the move-validate-broadcast sequence could expose timing where status is set before the board is fully updated, or vice versa. |
+| **Why It Matters** | A wrong winner invalidates the entire ELO system downstream. |
+
+### turn-order-maintained — Turn Order Never Violated
+
+| | |
+|---|---|
+| **Type** | Safety |
+| **Property** | A move is only applied when it comes from the current player. |
+| **Invariant** | `Always`: Before applying a move, `state.CurrentPlayer == player`. Assertion in `CanMakeMove`. |
+| **Antithesis Angle** | Evil players send out-of-turn moves. Antithesis explores interleavings where two moves from different players arrive close together on the inbox channel. |
+| **Why It Matters** | Turn order violation would produce illegal board states. |
+
+### board-state-valid — Board Configuration Always Legal
+
+| | |
+|---|---|
+| **Type** | Safety |
+| **Property** | The board never enters an impossible configuration (e.g., TTT with more than one extra piece for either player, Connect4 with floating pieces). |
+| **Invariant** | `Always`: After every state broadcast, validate the board against game-specific structural invariants. Workload-side assertion — deserialize state from WebSocket message and check. |
+| **Antithesis Angle** | State corruption bugs typically manifest under specific timing — Antithesis systematically explores move arrival ordering and concurrent reconnections. |
+| **Why It Matters** | Structural board corruption is a class of bug that causes silent downstream failures. |
+
+## ELO and Scoring Integrity
+
+Properties ensuring the rating system behaves correctly.
+
+### elo-zero-sum — ELO Changes Are Zero-Sum
+
+| | |
+|---|---|
+| **Type** | Safety |
+| **Property** | After a non-cancelled game result is processed, the sum of ELO changes across both players is zero. |
+| **Invariant** | `Always`: In `ReportSessionResult`, after computing new ELOs, assert `(newPlayer - oldPlayer) + (newOpponent - oldOpponent) == 0`. SUT-side assertion. |
+| **Antithesis Angle** | Concurrent result submissions, retries from the Reporter, and session expiry racing with game completion could cause double-updates or partial writes. |
+| **Why It Matters** | ELO inflation/deflation corrupts the leaderboard. The CalcElo function is correct in isolation (tested), but the DB transaction path under concurrency hasn't been tested. |
+
+### no-elo-change-on-cancel — Cancelled Games Don't Affect ELO
+
+| | |
+|---|---|
+| **Type** | Safety |
+| **Property** | When a session is cancelled, neither player's ELO, wins, losses, or draws change. |
+| **Invariant** | `Always`: In `ReportSessionResult` when `cancelled == true`, assert no player stats are modified. SUT-side assertion. |
+| **Antithesis Angle** | Cancellation can race with normal game completion. The session monitor cancels expired sessions, but the game server may simultaneously report a normal result. Antithesis explores this overlap. |
+| **Why It Matters** | The existing `log.Panicf("BUG: received cancelled result with a winner set")` guard suggests the developers know this is a risk area. |
+
+### no-double-elo-update — Session Result Processed Exactly Once
+
+| | |
+|---|---|
+| **Type** | Safety |
+| **Property** | Each session's ELO update is applied exactly once — not zero times, not twice. |
+| **Invariant** | `Always`: Track session IDs that have been processed. On each `ReportSessionResult` call, assert the session hasn't been processed before. SUT-side assertion in the DB layer. |
+| **Antithesis Angle** | The Reporter re-enqueues on temporary error. Matchmaker's cancel-session path also calls `ReportSessionResult`. Session monitor also calls it. All three paths could deliver the same session result. |
+| **Why It Matters** | Double ELO updates corrupt ratings. The current code has no idempotency guard on ReportSessionResult — the `completed_at` check is implicit (UPDATE succeeds even if already completed). Note: This property will likely fail immediately due to the missing idempotency guard. This is intentional — validates that Antithesis can find this class of bug. |
+
+## Session Lifecycle
+
+Properties ensuring sessions are created, run, and cleaned up correctly.
+
+### session-capacity-enforced — Game Server Respects Max Sessions
 
 | | |
 |---|---|
 | **Type** | Safety |
 | **Property** | The number of active sessions on a game server never exceeds `MaxSessions`. |
-| **Invariant** | `Always(activeSessions <= maxSessions)` — checked in health endpoint. Already instrumented as A3. The `Always` type fits because the condition must hold at every health check. |
-| **Antithesis Angle** | Rapid concurrent session creation requests arriving at the same game server while sessions are also completing. Race between `CreateSession` acquiring the lock and checking `len(s.sessions)`. |
-| **Why It Matters** | Exceeding capacity could cause resource exhaustion and degraded service. |
-| **Existing Coverage** | **FULLY COVERED** — A3 asserts this in the health endpoint. R7 and R8 confirm the capacity-full path is reached. |
+| **Invariant** | `Always`: After every session creation, `len(sessions) <= MaxSessions`. SUT-side assertion in `SessionManager.CreateSession`. |
+| **Antithesis Angle** | Concurrent session creation requests could race past the capacity check. The mutex should prevent this, but Antithesis explores whether there's a TOCTOU window. |
+| **Why It Matters** | Exceeding capacity could cause resource exhaustion and degrade all active games. |
 
-### session-always-two-players — Every Session Has Exactly Two Players
-
-| | |
-|---|---|
-| **Type** | Safety |
-| **Property** | When a non-cancelled session completes and ELO is updated, it always has exactly two players in the `player_session` table. |
-| **Invariant** | `Unreachable` if player count != 2. Already instrumented as U1. The `Unreachable` type is correct because the 2-player invariant is structural — it should be impossible to reach a state where it's violated. |
-| **Antithesis Angle** | Concurrent session creation with the same player (race in matchmaking), database corruption under concurrent writes, orphaned player_session rows from failed transactions. |
-| **Why It Matters** | ELO calculation assumes exactly two players. A mismatch causes incorrect ratings or a crash. |
-| **Existing Coverage** | **FULLY COVERED** — U1 asserts this at `internal/matchmaker/db.go:304`. |
-
-### elo-non-negative — ELO Ratings Never Go Negative
-
-| | |
-|---|---|
-| **Type** | Safety |
-| **Property** | No player's ELO rating ever becomes negative after a session result is processed. |
-| **Invariant** | `Always(newWinner >= 0 && newLoser >= 0)` — would be placed in `ReportSessionResult` after `CalcElo`. The `Always` type is correct because negative ELO is never acceptable. |
-| **Antithesis Angle** | Long chains of losses for low-ELO players, combined with draws. The ELO formula can theoretically produce negative values with extreme rating differentials. Antithesis explores many more game sequences than unit tests. |
-| **Why It Matters** | Negative ELO is semantically meaningless and could cause display/sorting bugs. |
-| **Existing Coverage** | **NOT COVERED** — No assertion exists on ELO bounds. `internal/elo.go` has no assertions. |
-
-### elo-conservation — ELO Changes Are Zero-Sum Per Match
-
-| | |
-|---|---|
-| **Type** | Safety |
-| **Property** | For every completed non-cancelled session, the total ELO change across both players sums to zero (within rounding tolerance). |
-| **Invariant** | `Always(abs(deltaWinner + deltaLoser) <= 1)` — placed in `ReportSessionResult` after computing new ratings. `Always` is correct because ELO is defined as zero-sum. Rounding tolerance of 1 accounts for integer arithmetic. |
-| **Antithesis Angle** | Exercise all game outcomes (win, loss, draw) across diverse ELO differentials. Antithesis generates varied match sequences that may trigger rounding edge cases the unit tests don't cover. |
-| **Why It Matters** | If ELO is not conserved, ratings drift and the leaderboard becomes meaningless over time. |
-| **Existing Coverage** | **NOT COVERED** — No assertion exists. `internal/elo_test.go` has unit tests but no conservation property. |
-
-### result-reported-for-every-session — Every Session Eventually Gets a Result
+### session-eventually-completes — Every Session Reaches Terminal State
 
 | | |
 |---|---|
 | **Type** | Liveness |
-| **Property** | Every session that is created in the matchmaker DB eventually has `completed_at` set (either via normal completion or timeout cancellation). |
-| **Invariant** | `Sometimes(true)` on a workload check that verifies no uncompleted sessions remain after all players finish. This is partially covered by the `eventually_queue_empty.sh` test driver, but a more targeted assertion in the workload or SUT could verify the DB directly. |
-| **Antithesis Angle** | Network partitions between game server and matchmaker preventing result delivery. Game server crash before reporting. Reporter channel full. Session monitor's periodic sweep is the backstop. |
-| **Why It Matters** | Orphaned sessions leave players stuck and prevent them from re-queuing. |
-| **Existing Coverage** | **PARTIALLY COVERED** — `eventually_queue_empty.sh` validates end-to-end flow works post-test, but doesn't directly check for orphaned sessions in the DB. S6 asserts sessions sometimes expire. |
+| **Property** | Every created session eventually reaches a terminal state (win, loss, draw, or cancel). |
+| **Invariant** | `Sometimes(session completed)`: After each session creation, eventually observe a terminal status. Workload-side assertion — players track whether each session they joined reached a terminal state. |
+| **Antithesis Angle** | Player disconnection, game server restarts, network partitions between player and game server — all could leave sessions hanging. The deadline timer and session monitor are the safety nets. |
+| **Why It Matters** | Stuck sessions consume capacity and leave players unable to re-queue. |
 
-### no-duplicate-result-application — Session Results Are Not Applied Twice
-
-| | |
-|---|---|
-| **Type** | Safety |
-| **Property** | A session result (ELO update) is applied at most once. If `ReportSessionResult` is called again for the same session, ELO is not recalculated. |
-| **Invariant** | `AlwaysOrUnreachable` — placed at the start of `ReportSessionResult`: if the session already has `completed_at` set, the function should bail without modifying ELO. Currently the UPDATE is unconditional. This is a potential bug, not just a missing assertion. |
-| **Antithesis Angle** | Reporter retries on temporary error (re-enqueues to `resultCh`), but the first attempt may have actually succeeded. The second call applies ELO changes again. Network partitions that cause timeouts but not actual failures are the trigger. |
-| **Why It Matters** | Double application of ELO changes corrupts ratings. |
-| **Existing Coverage** | **NOT COVERED** — No idempotency check exists in `ReportSessionResult`. The UPDATE at `db.go:283` is unconditional. |
-
-## Category: Matchmaking Correctness
-
-Properties ensuring the matchmaking algorithm works correctly.
-
-### matched-players-removed-from-queue — Matched Players Are Cleared From Queue
-
-| | |
-|---|---|
-| **Type** | Safety |
-| **Property** | After a match is published, neither player remains in the `queued` map. They are in `matched` or neither (if they left). |
-| **Invariant** | `Always` — after `publishMatch` succeeds (hasA && hasB), both players must be removed from `queued` and present in `matched`. Already implemented in the code logic but not explicitly asserted. A SUT-side `Always` after the delete/insert operations would add verification. |
-| **Antithesis Angle** | Concurrent `Unqueue` calls racing with `publishMatch`. The lock-release window between `collectMatches` and `publishMatch` is where races happen. |
-| **Why It Matters** | A player left in both `queued` and `matched` could be matched to a second session. |
-| **Existing Coverage** | **NOT COVERED** — The code logic handles this correctly, but there's no assertion verifying the postcondition. R2 confirms the race window is reached. |
-
-### elo-matching-respects-bounds — Players Only Match Within ELO Bounds
-
-| | |
-|---|---|
-| **Type** | Safety |
-| **Property** | When two players are matched, their ELO difference does not exceed `MaxEloDiff` (200) plus the time-based relaxation. |
-| **Invariant** | `Always(MatchElo(a.elo, b.elo, a.entry, b.entry))` — would be placed in `collectMatches` after a pair is selected. The `Always` type is correct because every match must satisfy ELO bounds. |
-| **Antithesis Angle** | Players with extreme ELO differentials queueing simultaneously. Time manipulation by Antithesis could affect the wait-time relaxation calculation. Many concurrent matches where ELO changes between when a player is read and when they're matched. |
-| **Why It Matters** | Unfair matches degrade the competitive experience and make ELO meaningless. |
-| **Existing Coverage** | **NOT COVERED** — `MatchElo` is called but not asserted at the match-output boundary. |
-
-### queue-fifo-ordering — Longest-Waiting Players Match First
-
-| | |
-|---|---|
-| **Type** | Safety |
-| **Property** | The matching algorithm considers players in queue-entry-time order (oldest first), preventing starvation of long-waiting players. |
-| **Invariant** | `Always` — the sorted candidates slice should be ordered by entry time. Could be asserted after `sortedQueuedCandidates()`. |
-| **Antithesis Angle** | Many players queueing simultaneously (same entry time), UUID tie-breaking behavior, players repeatedly queueing and unqueueing. |
-| **Why It Matters** | Without FIFO ordering, players could starve while newer arrivals get matched. |
-| **Existing Coverage** | **NOT COVERED** — The code sorts correctly (`match_queue.go:129-136`) but no assertion verifies this property under concurrent access. |
-
-## Category: Game Protocol Correctness
-
-Properties ensuring the game protocol handles moves, turns, and outcomes correctly.
-
-### turn-alternation — Players Alternate Turns Correctly
-
-| | |
-|---|---|
-| **Type** | Safety |
-| **Property** | After a valid move by the current player, `CurrentPlayer` switches to the opponent (except in Battleship where hits give extra turns). |
-| **Invariant** | `Always` — after each successful `MakeMove`, the state's `CurrentPlayer` is either the opponent (standard) or the same player (Battleship hit). Would need to be checked in `protocol.handleMove` after `session.MakeMove` succeeds. |
-| **Antithesis Angle** | Rapid move submissions, evil players sending out-of-turn moves, race between turn timer and move arrival. |
-| **Why It Matters** | Broken turn alternation means one player could make all moves, corrupting game integrity. |
-| **Existing Coverage** | **NOT COVERED** — `CanMakeMove` rejects out-of-turn moves, but there's no assertion that the turn transition itself is correct. R25 confirms out-of-turn moves are attempted. |
-
-### invalid-moves-never-change-state — Invalid Moves Don't Alter Game State
-
-| | |
-|---|---|
-| **Type** | Safety |
-| **Property** | If `MakeMove` returns an error, the game state is unchanged from before the call. |
-| **Invariant** | `Always(stateAfterError == stateBefore)` — would be placed in `protocol.handleMove` when `MakeMove` returns an error. The game implementations currently return the pre-mutation state on error, but a deep-equality check would verify this. |
-| **Antithesis Angle** | Evil players sending all forms of invalid moves (malformed JSON, out-of-bounds, occupied cells, wrong phase). Antithesis exercises many combinations of invalid input sequences. |
-| **Why It Matters** | A partially-applied invalid move would corrupt the game board. |
-| **Existing Coverage** | **NOT COVERED** — R11 and R12 confirm invalid moves are reached, but no assertion checks state preservation. |
-
-### game-terminates — Every Game Eventually Reaches a Terminal State
+### expired-sessions-cancelled — Deadline Enforcement Works
 
 | | |
 |---|---|
 | **Type** | Liveness |
-| **Property** | Every `RunToCompletion` call eventually exits with a terminal game status (P1Win, P2Win, Draw, or Cancelled). |
-| **Invariant** | `Sometimes(true)` — on the result message emission in `protocol.report()`. S11-S13 already cover some terminal states. The `Sometimes` type is appropriate because this is a progress property. |
-| **Antithesis Angle** | Turn timer + session deadline provide hard guarantees, but what if the protocol loop gets stuck? Evil players sending streams of invalid moves that reset the turn timer. |
-| **Why It Matters** | A stuck game session blocks players and consumes server resources. |
-| **Existing Coverage** | **PARTIALLY COVERED** — S11, S12, S13 assert that draws, cancellations, and wins sometimes occur. But there's no per-session assertion that every started game reaches a terminal state. |
+| **Property** | Sessions that exceed their deadline are eventually cancelled by the session monitor. |
+| **Invariant** | `Sometimes(expired session cancelled)`: The session monitor's `cancelExpiredSessions` function finds and cancels an expired session. SUT-side assertion — emit when an expired session is successfully cancelled. |
+| **Antithesis Angle** | The session monitor runs on a ticker. If the matchmaker is restarted or the ticker goroutine is delayed, expired sessions could accumulate. Antithesis can pause the monitor goroutine and then release it. |
+| **Why It Matters** | Without deadline enforcement, stuck sessions would permanently consume capacity. |
 
-### turn-timer-forces-completion — Turn Timer Terminates Stalled Games
-
-| | |
-|---|---|
-| **Type** | Safety |
-| **Property** | If no valid move is received within `turnTimeout`, the waiting player loses and the game ends. |
-| **Invariant** | `Always` — when the `turnTimer` fires and players are connected, the result should be the opponent's win status. This is implemented in the code (`protocol.go:134-135`) but not asserted. |
-| **Antithesis Angle** | Player disconnects right as turn timer fires. Evil player sends invalid moves that don't reset the timer. Two players connected but neither sends a valid move. |
-| **Why It Matters** | Without turn timer enforcement, a stalled player blocks the game indefinitely. |
-| **Existing Coverage** | **NOT COVERED** — The code implements this but there's no assertion on the specific outcome when the turn timer fires. |
-
-## Category: Fleet and Server Management
-
-Properties ensuring the fleet correctly manages game servers.
-
-### fleet-recovery-after-backoff — Fleet Recovers Servers After Backoff
+### result-reported-to-matchmaker — Game Results Reach the Matchmaker
 
 | | |
 |---|---|
 | **Type** | Liveness |
-| **Property** | After a game server enters backoff (temporary error or capacity full), it eventually becomes a candidate again for session creation. |
-| **Invariant** | `Sometimes(true)` — placed when a previously-backed-off server is selected as a candidate again. The `Sometimes` type fits because this is a progress/recovery property. |
-| **Antithesis Angle** | All game servers simultaneously entering backoff. Time progression during Antithesis exploration. Server recovery after transient network partitions. |
-| **Why It Matters** | If servers permanently stay in backoff, effective capacity drops and matchmaking stalls. |
-| **Existing Coverage** | **NOT COVERED** — R4 confirms "no servers available" is reached. R5 confirms temporary failures occur. But no assertion verifies recovery. |
+| **Property** | Every session that completes on the game server has its result eventually delivered to the matchmaker. |
+| **Invariant** | `Sometimes(result delivered)`: The Reporter successfully submits a result (HTTP 200 from matchmaker). SUT-side assertion in Reporter.submitResult. |
+| **Antithesis Angle** | Network partition between game server and matchmaker during result submission. The Reporter retries temporary errors but drops permanent ones. Antithesis explores whether retries eventually succeed or results are permanently lost. |
+| **Why It Matters** | Lost results mean matchmaker sessions stay "active" forever (until deadline expires them as cancelled), corrupting player stats. |
 
-### fleet-returns-valid-sessions — Fleet Only Returns Successfully Created Sessions
+### session-cleanup-complete — Finished Sessions Are Removed
 
 | | |
 |---|---|
 | **Type** | Safety |
-| **Property** | `Fleet.CreateSession` only returns a non-nil `SessionInfo` when the game server responded with HTTP 200. |
-| **Invariant** | `Always` — already implemented in code logic (returns on 200, continues on 503, errors on other). U2 guards the unexpected-status path. |
-| **Antithesis Angle** | Malformed HTTP responses, connection resets mid-response, race between timeout and response. |
-| **Why It Matters** | Returning a session that wasn't actually created would send players to a nonexistent game. |
-| **Existing Coverage** | **PARTIALLY COVERED** — U2 asserts unexpected status codes are unreachable. S8 asserts successful creation sometimes happens. But no assertion directly ties the return value to a 200 response. |
+| **Property** | After a session finishes, it is removed from the SessionManager's active sessions map. |
+| **Invariant** | `Always`: After the cleanup callback runs, the session ID is no longer in the sessions map. SUT-side assertion in the cleanup function. |
+| **Antithesis Angle** | Concurrent operations (new session creation, JoinSession) could interfere with cleanup. Antithesis explores whether the mutex correctly serializes these. |
+| **Why It Matters** | Leaked sessions reduce effective capacity and could serve stale data to spectators. |
 
-## Category: Result Reporting and Data Integrity
+## Matchmaking
 
-Properties ensuring game results are correctly reported and persisted.
+Properties ensuring the queue and matching system works correctly.
 
-### reporter-retries-temporary-errors — Reporter Retries on Temporary Failures
+### no-duplicate-match — Players Matched to Exactly One Session
+
+| | |
+|---|---|
+| **Type** | Safety |
+| **Property** | A player never appears in two concurrent active sessions. |
+| **Invariant** | `Always`: When moving a player from `queued` to `matched`, assert they're not already in `matched`. SUT-side assertion in `publishMatch`. |
+| **Antithesis Angle** | The window between `collectMatches` (releases lock) and `publishMatch` (re-acquires) is a race opportunity. Two concurrent `matchPlayers` invocations could both pair the same player. While the ticker design should prevent this, Antithesis explores whether timer coalescing or system pauses create the overlap. |
+| **Why It Matters** | A double-matched player would be expected in two game sessions simultaneously, causing one session to hang waiting for them. |
+
+### matchmaking-progress — Queued Players Eventually Get Matched
 
 | | |
 |---|---|
 | **Type** | Liveness |
-| **Property** | When the reporter encounters a temporary transport error, it re-enqueues the result for retry. |
-| **Invariant** | `Reachable` — already instrumented as R13. The `Reachable` type is correct because we want to confirm this retry path is exercised. |
-| **Antithesis Angle** | Network partitions between game server and matchmaker. Antithesis can inject faults to trigger temporary errors and verify the retry path. |
-| **Why It Matters** | Without retries, game results could be permanently lost during transient network issues. |
-| **Existing Coverage** | **FULLY COVERED** — R13 asserts this path is reachable. |
+| **Property** | When two or more compatible players are in the queue, they are eventually matched. |
+| **Invariant** | `Sometimes(match created)`: After queueing, a player eventually receives a SessionInfo. Workload-side assertion — players track how long they wait. |
+| **Antithesis Angle** | ELO difference relaxation over time means even mismatched players should eventually pair. But if the matcher goroutine is delayed (Antithesis can pause it), or fleet errors prevent session creation, queued players could wait indefinitely. |
+| **Why It Matters** | Players stuck in queue forever is the most visible user-facing failure. |
 
-### elo-updates-match-game-outcome — ELO Changes Reflect the Actual Game Outcome
-
-| | |
-|---|---|
-| **Type** | Safety |
-| **Property** | After a session with a winner, the winner's ELO increases (or stays same) and the loser's ELO decreases (or stays same). After a draw, both change symmetrically. |
-| **Invariant** | `Always` — placed in `ReportSessionResult` after `CalcElo`. For wins: `Always(newWinner >= winnerElo)`. For draws: `Always(abs(newWinner - newLoser) <= abs(winnerElo - loserElo) + 1)` (ELO converges). |
-| **Antithesis Angle** | Extreme ELO differentials (very high vs very low), many consecutive wins/losses, rapid session completion generating many concurrent ELO updates. |
-| **Why It Matters** | Incorrect ELO movement undermines the entire ranking system. |
-| **Existing Coverage** | **NOT COVERED** — `internal/elo_test.go` has unit tests but no in-SUT assertion on ELO direction correctness. |
-
-## Category: Connection Handling
-
-Properties ensuring WebSocket connections and player sessions are managed correctly.
-
-### reconnect-preserves-player-assignment — Reconnecting Players Keep Their Player Number
-
-| | |
-|---|---|
-| **Type** | Safety |
-| **Property** | When a player reconnects to an in-progress session, they retain their original player assignment (P1 or P2). |
-| **Invariant** | `Always(reconnectedPlayer == existingPlayer)` — placed in `protocol.handleConn` when replacing an existing connection. Currently the code preserves `existing.player` in the new `playerConn`. |
-| **Antithesis Angle** | Player WebSocket drops and reconnects during active game. Evil player's extra-connect chaos triggers connection replacement. Multiple rapid reconnections. |
-| **Why It Matters** | If a reconnecting player gets a different player number, they'd be playing the wrong side of the board. |
-| **Existing Coverage** | **PARTIALLY COVERED** — R9 confirms reconnection is reached. The code preserves the player assignment, but no assertion verifies it. |
-
-### third-player-rejected — Sessions Reject Connections Beyond Two Players
-
-| | |
-|---|---|
-| **Type** | Safety |
-| **Property** | When a session already has two distinct connected players, any additional connection from a new player ID receives an error and is not added to the game. |
-| **Invariant** | `Always(len(players) <= 2)` — could be added as an invariant check in `handleConn`. R10 already confirms this path is reached. |
-| **Antithesis Angle** | Evil players' extra-connect chaos generates random-ID connection attempts. Multiple evil players targeting the same session simultaneously. |
-| **Why It Matters** | A third player in a two-player game would corrupt the game state. |
-| **Existing Coverage** | **PARTIALLY COVERED** — R10 confirms extra connections are rejected. The code logic handles it correctly, but no `Always` asserts the player count invariant. |
-
-## Category: System Recovery
-
-Properties ensuring the system recovers from failures.
-
-### services-recover-to-healthy — All Services Eventually Become Healthy
+### orphaned-session-handled — Race-Created Sessions Don't Leak
 
 | | |
 |---|---|
 | **Type** | Liveness |
-| **Property** | After faults are stopped, all services (matchmaker + 3 game servers) eventually respond to health checks. |
-| **Invariant** | Checked by `eventually_health_check.sh` test driver. `Sometimes` would also be appropriate as an SDK assertion if health checks were instrumented. |
-| **Antithesis Angle** | Process crashes, network partitions, resource exhaustion during testing. Recovery after all faults are lifted. |
-| **Why It Matters** | A system that doesn't recover after transient faults is not production-ready. |
-| **Existing Coverage** | **FULLY COVERED** — `eventually_health_check.sh` validates this. |
+| **Property** | If `collectMatches` pairs players who then unqueue before `publishMatch`, the orphaned game server session is eventually cleaned up by the deadline timeout. |
+| **Invariant** | `Sometimes(orphaned session expired)`: A session that was created on the game server but never had both players connect is eventually cancelled. SUT-side `Reachable` in `cancelExpiredSessions` when cancelling a session with no result. |
+| **Antithesis Angle** | This race is difficult to trigger deterministically — it requires a player to unqueue during the network round-trip to the game server. Antithesis can systematically explore this timing. |
+| **Why It Matters** | Orphaned sessions consume game server capacity until they expire. |
 
-### post-fault-game-completion — System Can Complete Games After Faults
+## Player Connection
+
+Properties ensuring WebSocket connections and reconnections work correctly.
+
+### player-reconnect-works — Reconnected Players Resume Game
 
 | | |
 |---|---|
-| **Type** | Liveness |
-| **Property** | After all test drivers complete and faults are stopped, two fresh players can queue, match, play a game, and complete successfully. |
-| **Invariant** | Checked by `eventually_queue_empty.sh` test driver. |
-| **Antithesis Angle** | Validates that accumulated state corruption from testing doesn't prevent future operations. |
-| **Why It Matters** | Even if individual sessions fail during fault injection, the system must remain functional afterward. |
-| **Existing Coverage** | **FULLY COVERED** — `eventually_queue_empty.sh` validates this. |
+| **Type** | Safety |
+| **Property** | When a player disconnects and reconnects to an active session, they receive the current game state and can continue playing. |
+| **Invariant** | `Always`: After a reconnection (replacing an existing player connection), the new connection receives a state message with the current board. Workload-side assertion — reconnecting player checks it receives valid state. |
+| **Antithesis Angle** | Reconnection races with move processing, other player's connection, or session completion. Antithesis explores whether the old connection's write goroutine interferes with the new one. |
+| **Why It Matters** | WebSocket connections are inherently fragile. If reconnection fails, the game hangs until turn timeout. |
 
-## Category: Reachability and Coverage
+### third-player-rejected — Excess Connections Are Rejected
 
-Properties ensuring diverse system behaviors are exercised.
+| | |
+|---|---|
+| **Type** | Safety |
+| **Property** | A session with two connected players rejects additional connection attempts from unknown player IDs with an error message. |
+| **Invariant** | `Always`: When `handleConn` is called with a pid not in `p.players` and `len(p.players) == 2`, the connection receives an error and is not added to the players map. SUT-side assertion. |
+| **Antithesis Angle** | Evil players' `runExtraConnectChaos` sends random-ID connections. Under heavy load with many concurrent sessions, these probes could arrive at unexpected times. |
+| **Why It Matters** | A third player corrupting a session would break the 2-player game model. |
 
-### all-game-types-played — All Three Game Types Are Played
+## State Consistency
+
+Properties ensuring all observers see consistent state.
+
+### ~~spectator-state-consistency~~ — SUPERSEDED by `spectator-receives-valid-state`
+
+This property has been superseded by `spectator-receives-valid-state` (in System Health and Recovery section), which places the validation SUT-side in `BroadcastState` instead of requiring a workload spectator client. The SUT-side approach validates state before it reaches any observer (players and spectators alike), providing strictly stronger coverage without workload dependencies.
+
+### player-sees-terminal-state — Players Observe Game Completion
+
+| | |
+|---|---|
+| **Type** | Safety |
+| **Property** | When a game reaches a terminal state, connected players receive the terminal state message before the WebSocket is closed. |
+| **Invariant** | `AlwaysOrUnreachable`: When a player is connected at game end, they receive a terminal state message. Workload-side assertion — players check that they received a terminal state when the game completes normally. |
+| **Antithesis Angle** | The `sendLatest` pattern could drop the terminal state if the channel is full. Network disruption right as the game ends could prevent delivery. Antithesis explores these timing windows. |
+| **Why It Matters** | Players that never see the terminal state can't properly complete their game loop. |
+
+## Fleet and Availability
+
+Properties ensuring the system handles game server availability correctly.
+
+### fleet-failover — Fleet Uses Available Servers
+
+| | |
+|---|---|
+| **Type** | Safety |
+| **Property** | When creating a session, the fleet skips servers that returned 503 or had network errors within the retry window, and uses available servers. |
+| **Invariant** | `AlwaysOrUnreachable`: When Fleet.CreateSession succeeds, the chosen server was a valid candidate (not in retry backoff). SUT-side assertion. |
+| **Antithesis Angle** | Antithesis can partition the game server, causing the fleet to enter retry-backoff state, then heal the partition. The fleet should resume using the server after `retryAt` passes. |
+| **Why It Matters** | Incorrect failover logic could route sessions to unavailable servers, causing them to fail immediately. |
+
+## Reachability
+
+Properties guiding Antithesis to explore interesting code paths.
+
+### all-game-types-played — All Three Game Types Are Exercised
 
 | | |
 |---|---|
 | **Type** | Reachability |
-| **Property** | During a test run, sessions of all three game types (Tic-Tac-Toe, Connect4, Battleship) are created and played. |
-| **Invariant** | `Reachable` — already instrumented as R21, R22, R23 (one per game type). |
-| **Antithesis Angle** | Random game selection might skew toward one type. Antithesis-controlled RNG ensures diverse selection. |
-| **Why It Matters** | All game implementations need testing, not just the most commonly selected one. |
-| **Existing Coverage** | **FULLY COVERED** — R21, R22, R23 individually assert each game type is played. |
+| **Property** | TicTacToe, Connect4, and Battleship games are all played during a test run. |
+| **Invariant** | `Reachable`: One assertion per game type, placed where a session is created for that game kind. SUT-side in `SessionManager.CreateSession`. |
+| **Antithesis Angle** | Ensures the workload's random game selection actually covers all game types. Without this, Antithesis might get stuck in a local optimum testing only one game type. |
+| **Why It Matters** | Each game has different code paths (especially Battleship with its setup phase). Testing all three is necessary for coverage. |
 
-### all-game-outcomes-observed — All Terminal States Are Reached
-
-| | |
-|---|---|
-| **Type** | Reachability |
-| **Property** | During a test run, games end in all possible terminal states: P1Win, P2Win, Draw, and Cancelled. |
-| **Invariant** | `Sometimes` — already partially instrumented as S11 (draws), S12 (cancellations), S13 (wins). Win coverage doesn't distinguish P1Win vs P2Win. |
-| **Antithesis Angle** | With enough games and fault injection, all outcomes should be reached. Evil players increase cancellation rate. |
-| **Why It Matters** | Each terminal state exercises different code paths (ELO calculation, no-op for draw, cleanup for cancellation). |
-| **Existing Coverage** | **MOSTLY COVERED** — S11, S12, S13 cover the major categories. No separate assertion for P1Win vs P2Win. |
-
-### evil-behavior-exercised — Evil Player Behaviors Are All Reached
+### draw-outcome-reached — Draw Outcomes Are Reachable
 
 | | |
 |---|---|
 | **Type** | Reachability |
-| **Property** | During a test run, all evil player behaviors are exercised: bad moves, out-of-turn moves, malformed JSON, extra connections, queue abandonment. |
-| **Invariant** | `Reachable` — already instrumented as R16, R25, R26, R27. Additionally R11 and R12 confirm invalid moves reach the server. |
-| **Antithesis Angle** | Evil player rates are configured to ensure all behaviors fire. Antithesis-controlled RNG may influence which behaviors trigger. |
-| **Why It Matters** | Adversarial behavior is the primary mechanism for surfacing protocol robustness issues. |
-| **Existing Coverage** | **FULLY COVERED** — R16, R25, R26, R27 cover all evil behaviors. |
+| **Property** | At least one TicTacToe or Connect4 game ends in a draw. Battleship cannot draw by game rules (game ends only when all opponent ships are sunk). |
+| **Invariant** | `Reachable`: Assertion fires when `state.Status == Draw` at game completion. SUT-side in Protocol.report(). |
+| **Antithesis Angle** | Draws require specific board configurations. The AIs' strategies may rarely produce draws. This assertion ensures Antithesis explores paths leading to draws. |
+| **Why It Matters** | Draw handling is a distinct code path (no winner, both players update ELO symmetrically). |
 
-## Category: Session Timeout and Deadline Management
-
-### session-deadline-enforced — Expired Sessions Are Eventually Cancelled
+### turn-timeout-fires — Turn Timer Triggers Game End
 
 | | |
 |---|---|
-| **Type** | Liveness |
-| **Property** | Any session that passes its deadline without completing is eventually marked as cancelled by the session monitor. |
-| **Invariant** | `Sometimes(len(expired) > 0)` — already instrumented as S6. The `Sometimes` type is appropriate because this is a progress property that should happen at least once in a sufficiently long run. |
-| **Antithesis Angle** | Sessions that stall due to player disconnection, network partitions preventing result delivery, game server crashes. The 2-second monitor interval in Antithesis config means deadlines are checked frequently. |
-| **Why It Matters** | Unreaped expired sessions leak resources and prevent players from re-queuing. |
-| **Existing Coverage** | **FULLY COVERED** — S6 asserts expiration sometimes occurs. |
+| **Type** | Reachability |
+| **Property** | The turn timeout fires at least once, ending a game because a player was too slow. |
+| **Invariant** | `Reachable`: Assertion in the `<-p.turnTimer.C` case of the protocol's select loop. SUT-side. |
+| **Antithesis Angle** | Antithesis can pause player processes, causing turn timeouts to fire. This exercises the timeout→opponent-wins path. |
+| **Why It Matters** | The turn timeout is a critical liveness mechanism. If it never fires in testing, the timeout handling code is untested. |
 
-### game-winner-has-winning-condition — Game Winners Have a Valid Winning Condition on the Board
+### evil-move-rejected — Malicious Moves Are Handled Gracefully
+
+| | |
+|---|---|
+| **Type** | Reachability |
+| **Property** | An evil player's malformed or invalid move is rejected with an error, and the game continues normally. |
+| **Invariant** | `Reachable`: Assertion fires when `handleMove` returns an error to the player. SUT-side in Protocol.handleMove(). |
+| **Antithesis Angle** | Evil players send malformed JSON, out-of-bounds moves, and out-of-turn moves. Antithesis explores whether these are always handled gracefully or whether specific timing causes them to corrupt state. |
+| **Why It Matters** | Error handling for invalid input is a common source of bugs, especially under concurrent access. |
+
+### session-deadline-fires — Session Deadline Cancels Game
+
+| | |
+|---|---|
+| **Type** | Reachability |
+| **Property** | The session deadline timer fires at least once, cancelling a game. |
+| **Invariant** | `Reachable`: Assertion in the `<-timer.C` case of the protocol's select loop. SUT-side. |
+| **Antithesis Angle** | With shortened timeouts in the Antithesis deployment, deadline cancellation is more likely. Antithesis can also delay player connections to trigger deadlines. |
+| **Why It Matters** | The deadline timer is the last-resort cleanup mechanism. If it never fires, that code path is untested. |
+
+### max-sessions-reached — Game Server Hits Capacity Limit
+
+| | |
+|---|---|
+| **Type** | Reachability |
+| **Property** | The game server reaches its maximum session count and returns 503. |
+| **Invariant** | `Reachable`: Assertion fires when `ErrMaxSessions` is returned. SUT-side in `SessionManager.CreateSession`. |
+| **Antithesis Angle** | With a bounded MaxSessions and enough concurrent players, the game server should eventually fill up. Antithesis can slow down game completion to increase the chance of hitting capacity. |
+| **Why It Matters** | The 503 + Retry-After response path is the backpressure mechanism for the entire system. |
+
+## System Health and Recovery
+
+Properties ensuring the system recovers from failures and maintains global consistency.
+
+### leaderboard-reflects-games — Global ELO Conservation
 
 | | |
 |---|---|
 | **Type** | Safety |
-| **Property** | When a game ends with P1Win or P2Win, the game board contains a valid winning condition for the winner (3-in-a-row for TicTacToe, 4-in-a-row for Connect4, all opponent ships sunk for Battleship). |
-| **Invariant** | `Always` — checked in the protocol's `report()` function when `status` is P1Win or P2Win. Game-specific: verify `checkWinFor(winner)` for TicTacToe, `checkWinAt(lastCol, lastRow, winner)` for Connect4, `hitCount(winner) == totalShipCells` for Battleship. |
-| **Antithesis Angle** | Evil players sending corrupt moves may trigger edge cases in win detection. Antithesis explores game state space more thoroughly than unit tests. The combination of valid and invalid moves in rapid succession could expose win-detection bugs. |
-| **Why It Matters** | A false win declaration would end the game prematurely and award incorrect ELO. |
-| **Existing Coverage** | **NOT COVERED** — No assertion verifies that the win condition on the board matches the declared winner. The game implementations check this internally but there's no independent verification at the protocol level. |
-| **Note** | Gap-fill from Coverage Balance evaluation. |
+| **Property** | The sum of all player ELO ratings equals `count(players) * DefaultElo` (1000). Any deviation indicates ELO inflation or deflation from double-updates, lost results, or other corruption. |
+| **Invariant** | `Always`: Periodically query the leaderboard and verify `sum(elo) == count(players) * 1000`. Workload-side assertion in the `eventually_check_leaderboard` test command. |
+| **Antithesis Angle** | Per-transaction zero-sum (elo-zero-sum) doesn't catch cumulative drift from double-updates across different transactions. This global check catches drift regardless of cause. |
+| **Why It Matters** | The strongest end-to-end ELO integrity check. Subsumes per-transaction checks for detecting real corruption. |
 
-### player-eventually-matched — Queued Players Eventually Receive a Match
+### player-recovers-after-matchmaker-restart — Matchmaker Restart Recovery
 
 | | |
 |---|---|
 | **Type** | Liveness |
-| **Property** | A player who remains in the matchmaker queue eventually receives a session assignment, assuming at least one other player is also queued and game servers are available. |
-| **Invariant** | `Sometimes(true)` — in the player loop when a match assignment is received. Already partially instrumented as R17 ("players sometimes receive a new match assignment"). A stronger form would be an `eventually_` test command that verifies no players remain in the queue after all drivers complete. |
-| **Antithesis Angle** | Under fault injection, game servers may be unavailable or in backoff. The ELO relaxation over time (`EloDiffRelaxRate = 50/sec`) should ensure that even mismatched players eventually pair. Network partitions between players and matchmaker could prevent polling. |
-| **Why It Matters** | A stuck player represents a permanent resource leak and a broken user experience. |
-| **Existing Coverage** | **PARTIALLY COVERED** — R17 confirms players sometimes get matched. `eventually_queue_empty.sh` validates post-test matching works. But no assertion checks that all players who want to match eventually do. |
-| **Note** | Gap-fill from Coverage Balance evaluation. |
+| **Property** | After the matchmaker process restarts, players that were mid-queue or mid-match can eventually re-queue and play new games. |
+| **Invariant** | `Sometimes(post-restart game completed)`: After a matchmaker restart, at least one game completes successfully. Workload-side assertion — players track whether they complete a game after observing a queue error (indicating restart). |
+| **Antithesis Angle** | Matchmaker restart loses in-memory `queued`/`matched` maps while SQLite persists session records. Players in `matched` at crash time have active DB sessions but no in-memory tracking. Antithesis can kill the matchmaker process at various points in the lifecycle. |
+| **Why It Matters** | Process restarts are the most common failure mode. If the system can't recover, the entire platform is unavailable. |
 
-### no-completed-session-expires — Completed Sessions Are Not Re-Cancelled
+### protocol-not-blocked — Protocol Goroutine Remains Responsive
 
 | | |
 |---|---|
 | **Type** | Safety |
-| **Property** | The session monitor never selects a session that already has `completed_at` set. The SQL query `WHERE completed_at IS NULL` ensures this, but concurrent completion during the monitor scan could cause a race. |
-| **Invariant** | `Always` — in `cancelExpiredSessions`, after fetching expired session IDs, each call to `ReportSessionResult` should verify the session is still uncompleted. This ties into the `no-duplicate-result-application` property. |
-| **Antithesis Angle** | Tight timing between a game completing normally and the session monitor scanning. The 2-second monitor interval and 1-minute session timeout create a window where both could fire near-simultaneously. |
-| **Why It Matters** | Re-cancelling a completed session would overwrite the legitimate result and corrupt ELO. |
-| **Existing Coverage** | **NOT COVERED** — The SQL query filters correctly, but there's no assertion guarding against TOCTOU between the SELECT and the UPDATE. This is closely related to `no-duplicate-result-application`. |
+| **Property** | The protocol goroutine's select loop continues to process timer events even when result delivery is delayed. |
+| **Invariant** | `Always`: The turn timeout and session deadline timers fire within a bounded time of their scheduled expiry. SUT-side assertion — track time between timer fire and processing. |
+| **Antithesis Angle** | When `resultCh` fills (matchmaker unreachable while games complete), `Protocol.report()` blocks on `p.result <- resultMsg{...}`, stalling the entire select loop. Turn timers and deadline timers fire but aren't processed. Antithesis can partition the matchmaker to trigger this. |
+| **Why It Matters** | A blocked protocol goroutine makes games appear hung — no moves processed, no timeouts enforced, no cleanup. This is a real liveness bug. |
+
+### ghost-player-sessions-cleaned-up — Abandoned Queue Entries Don't Leak
+
+| | |
+|---|---|
+| **Type** | Liveness |
+| **Property** | Sessions created for ghost queue entries (from evil player's `QueueAbandonRate`) are eventually cancelled via the deadline timeout. |
+| **Invariant** | `Sometimes(ghost session expired)`: A session where one player never connects is eventually cancelled. SUT-side assertion in `cancelExpiredSessions` or the protocol's deadline path when `len(p.players) < 2`. |
+| **Antithesis Angle** | Ghost queue entries are matched to real players, creating sessions where one player connects normally but the ghost never does. The session hangs until the turn timer gives the connected player a win, or the session deadline cancels it. |
+| **Why It Matters** | Ghost entries consume matchmaking resources and create frustrating experiences for real players who get matched against no-shows. |
+
+### spectator-receives-valid-state — Broadcast State Is Structurally Valid
+
+| | |
+|---|---|
+| **Type** | Safety |
+| **Property** | Every state broadcast via `BroadcastState` is structurally valid for its game type. |
+| **Invariant** | `Always`: In `BroadcastState`, validate the serialized state against game-specific structural invariants before sending. SUT-side assertion — avoids dependency on a spectator workload client. |
+| **Antithesis Angle** | Replaces the workload-side `spectator-state-consistency` with a SUT-side check that doesn't require a spectator client in the workload. Catches serialization bugs, partial state updates, or any mutation that bypasses validation. |
+| **Why It Matters** | All observers (players and spectators) receive state through this path. A single invalid broadcast corrupts every connected client's view. |

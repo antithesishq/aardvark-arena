@@ -1,145 +1,90 @@
 # Property Relationships
 
-## Cluster: Session Result Integrity
+## Clusters
 
-Properties related to correct session outcomes and their reporting.
+### Cluster 1: Game Rule Correctness
+**Properties**: `game-rules-enforced`, `correct-winner-detection`, `turn-order-maintained`, `board-state-valid`, `spectator-receives-valid-state`
 
-| Property | Role in Cluster |
-|----------|----------------|
-| `cancelled-session-no-winner` | Core invariant: cancelled sessions have no winner |
-| `no-duplicate-result-application` | Guard: results are applied at most once |
-| `no-completed-session-expires` | Specific case: session monitor doesn't overwrite completed sessions |
-| `result-reported-for-every-session` | Liveness: every session eventually gets a result |
-| `reporter-retries-temporary-errors` | Mechanism: retry ensures delivery under transient failures |
+These properties form a hierarchy:
+- `turn-order-maintained` is a prerequisite for `game-rules-enforced` (if turn order is violated, the board state is likely invalid).
+- `game-rules-enforced` and `board-state-valid` cover different failure classes: `game-rules-enforced` catches mutation bugs in `MakeMove`, while `board-state-valid` catches serialization or structural corruption. Neither dominates the other.
+- `spectator-receives-valid-state` is a SUT-side version of `board-state-valid` placed in `BroadcastState`, catching validation gaps before state reaches any observer.
+- `correct-winner-detection` depends on valid board state — winner detection checks the board.
+- `evil-move-rejected` is an exercise mechanism for this cluster — it generates the invalid inputs that stress-test rule enforcement.
 
-**Connections:**
-- `no-duplicate-result-application` dominates `no-completed-session-expires` — fixing the former (adding an idempotency check to `ReportSessionResult`) automatically fixes the latter.
-- `reporter-retries-temporary-errors` is the mechanism that makes `no-duplicate-result-application` important — without retries, duplicates wouldn't occur.
-- `cancelled-session-no-winner` could be violated if `no-duplicate-result-application` fails: a session completes with a winner, then gets overwritten as cancelled, breaking the inverse invariant.
+**Shared code paths**: `CanMakeMove`, `MakeMove`, `Protocol.handleMove`, `BroadcastState`.
 
-## Cluster: ELO Correctness
+Note: These properties operate on a single-goroutine protocol, so their Antithesis value is primarily catching serialization or state corruption bugs, not concurrency issues.
 
-Properties related to the rating system.
+### Cluster 2: ELO Integrity
+**Properties**: `elo-zero-sum`, `no-elo-change-on-cancel`, `no-double-elo-update`, `leaderboard-reflects-games`
 
-| Property | Role in Cluster |
-|----------|----------------|
-| `elo-non-negative` | Bound: ratings never go below zero |
-| `elo-conservation` | Invariant: rating changes are zero-sum per match |
-| `elo-updates-match-game-outcome` | Invariant: winners gain, losers lose |
-| `elo-matching-respects-bounds` | Input constraint: matched players are within ELO range |
+These properties protect the rating system from different angles:
+- `no-double-elo-update` is the strongest per-transaction check — if results are processed exactly once, ELO zero-sum follows naturally from CalcElo correctness.
+- `no-elo-change-on-cancel` is independent — it can be violated even if double-update is prevented (a cancel that races with a normal completion could produce ELO changes on a session that ends up marked as cancelled).
+- `leaderboard-reflects-games` is the global end-to-end check that catches cumulative drift from any cause, including per-transaction bugs that the other properties miss.
+- `correct-winner-detection` feeds into this cluster — wrong winner means wrong ELO update target.
 
-**Connections:**
-- `elo-updates-match-game-outcome` implies `elo-non-negative` in practice (if winners always gain, ratings trend upward), but not formally (a player could still go negative through draws with lower-rated players).
-- `elo-conservation` is independent of `elo-updates-match-game-outcome` — conservation holds even if the direction is wrong (though that would be a different bug).
-- `no-duplicate-result-application` (from the Result Integrity cluster) directly affects all ELO properties — double application corrupts all of them.
+**Shared code paths**: `ReportSessionResult`, `CalcElo`, `cancelExpiredSessions`, `Leaderboard`.
 
-## Cluster: Matchmaking Lifecycle
+### Cluster 3: Session Lifecycle
+**Properties**: `session-eventually-completes`, `expired-sessions-cancelled`, `result-reported-to-matchmaker`, `session-cleanup-complete`, `session-capacity-enforced`, `protocol-not-blocked`
 
-Properties related to the queue-match-assign cycle.
+These form a lifecycle chain:
+- `session-eventually-completes` → `result-reported-to-matchmaker` → ELO update (Cluster 2).
+- `expired-sessions-cancelled` is the safety net when normal completion fails.
+- `session-cleanup-complete` recovers capacity after session ends.
+- `session-capacity-enforced` is the upstream guard that prevents resource exhaustion.
+- `protocol-not-blocked` ensures the protocol goroutine remains responsive even when result delivery is delayed. Without this, sessions can appear hung despite timers firing.
+- `orphaned-session-handled` and `ghost-player-sessions-cleaned-up` are special cases where sessions are created but players don't connect.
 
-| Property | Role in Cluster |
-|----------|----------------|
-| `matched-players-removed-from-queue` | Invariant: matched players leave the queue |
-| `queue-fifo-ordering` | Fairness: oldest players match first |
-| `elo-matching-respects-bounds` | Constraint: matched players are compatible |
+**Shared code paths**: `Protocol.RunToCompletion`, `Protocol.report`, `Reporter.submitResult`, `SessionManager.cleanup`, `DB.cancelExpiredSessions`.
 
-**Connections:**
-- `matched-players-removed-from-queue` prevents double-matching, which would violate `session-always-two-players` (from the Game Protocol cluster).
-- `queue-fifo-ordering` affects `elo-matching-respects-bounds` — if ordering is wrong, the algorithm might skip compatible pairs in favor of incompatible ones.
+### Cluster 4: Matchmaking
+**Properties**: `no-duplicate-match`, `matchmaking-progress`, `orphaned-session-handled`, `ghost-player-sessions-cleaned-up`
 
-## Cluster: Game Protocol
+- `no-duplicate-match` is a safety property protecting the queue invariant.
+- `matchmaking-progress` is a liveness property requiring the entire matchmaking pipeline to work.
+- `orphaned-session-handled` is a failure-mode property for the race between matching and session creation.
+- `ghost-player-sessions-cleaned-up` covers the evil player's queue-abandon behavior creating phantom entries.
 
-Properties related to in-game correctness.
+**Shared code paths**: `matchPlayers`, `collectMatches`, `publishMatch`, `Fleet.CreateSession`.
 
-| Property | Role in Cluster |
-|----------|----------------|
-| `turn-alternation` | Invariant: correct turn order |
-| `invalid-moves-never-change-state` | Invariant: errors don't corrupt state |
-| `game-terminates` | Liveness: games end |
-| `turn-timer-forces-completion` | Mechanism: stalled games are resolved |
-| `session-always-two-players` | Precondition: games have exactly two players |
-| `third-player-rejected` | Guard: extra connections don't corrupt game |
+### Cluster 5: Connection Resilience
+**Properties**: `player-reconnect-works`, `third-player-rejected`, `player-sees-terminal-state`
 
-**Connections:**
-- `turn-timer-forces-completion` is one mechanism that ensures `game-terminates`.
-- `invalid-moves-never-change-state` + `turn-alternation` together ensure game state integrity — invalid moves don't corrupt state, and valid moves advance turns correctly.
-- `session-always-two-players` and `third-player-rejected` protect the precondition for `turn-alternation` (which assumes exactly two players).
+- `player-reconnect-works` and `third-player-rejected` both test `handleConn`.
+- `player-sees-terminal-state` depends on connection health at game end.
 
-## Cluster: Connection Management
+**Shared code paths**: `Protocol.handleConn`, `sessionHandle.Join`, `sendLatest`.
 
-Properties related to WebSocket and player connections.
+### Cluster 6: System Recovery
+**Properties**: `player-recovers-after-matchmaker-restart`, `fleet-failover`
 
-| Property | Role in Cluster |
-|----------|----------------|
-| `reconnect-preserves-player-assignment` | Invariant: reconnection doesn't change player role |
-| `third-player-rejected` | Guard: extra connections rejected |
+- `player-recovers-after-matchmaker-restart` tests the hardest recovery scenario — volatile state loss with persistent state retained.
+- `fleet-failover` tests game server unavailability and retry-backoff recovery.
 
-**Connections:**
-- Both properties protect game protocol integrity by ensuring the player-to-role mapping is stable.
-- `reconnect-preserves-player-assignment` handles the "known player returns" case; `third-player-rejected` handles the "unknown player arrives" case.
+**Shared code paths**: `matchmaker.New()`, `Fleet.CreateSession`, `NewDB`.
 
-## Cluster: System Recovery
+### Cluster 7: Reachability Targets
+**Properties**: `all-game-types-played`, `draw-outcome-reached`, `turn-timeout-fires`, `evil-move-rejected`, `session-deadline-fires`, `max-sessions-reached`
 
-Properties related to post-fault behavior.
-
-| Property | Role in Cluster |
-|----------|----------------|
-| `services-recover-to-healthy` | Liveness: services recover |
-| `post-fault-game-completion` | Liveness: system functions after faults |
-| `fleet-recovery-after-backoff` | Mechanism: game servers re-enter candidate pool |
-| `session-deadline-enforced` | Mechanism: expired sessions are cleaned up |
-
-**Connections:**
-- `fleet-recovery-after-backoff` is a precondition for `post-fault-game-completion` — if game servers stay in backoff, new games can't be created.
-- `session-deadline-enforced` ensures stale state is cleaned up, supporting `services-recover-to-healthy`.
-
-## Cluster: Game Logic (Gap-Fill)
-
-Properties verifying game-specific invariants.
-
-| Property | Role in Cluster |
-|----------|----------------|
-| `game-winner-has-winning-condition` | Invariant: declared winners have valid board conditions |
-| `all-game-types-played` | Coverage: all game implementations are exercised |
-| `all-game-outcomes-observed` | Coverage: all terminal states are reached |
-
-**Connections:**
-- `game-winner-has-winning-condition` provides independent verification of what `turn-alternation` and `invalid-moves-never-change-state` protect at the move level.
-- `all-game-types-played` is a precondition for `game-winner-has-winning-condition` having full coverage — if a game type is never played, its win condition is never checked.
-
-## Cluster: Player Lifecycle (Gap-Fill)
-
-| Property | Role in Cluster |
-|----------|----------------|
-| `player-eventually-matched` | Liveness: players get matched |
-| `matched-players-removed-from-queue` | Invariant: matched players leave queue |
-| `elo-matching-respects-bounds` | Constraint: matches are fair |
-
-**Connections:**
-- `player-eventually-matched` depends on `fleet-recovery-after-backoff` (from System Recovery) — if no servers are available, matching stalls.
-- `matched-players-removed-from-queue` is a mechanism that enables `player-eventually-matched` — if matched players don't leave the queue, they block slots.
-
-## Cluster: Server Capacity and Routing
-
-| Property | Role in Cluster |
-|----------|----------------|
-| `session-capacity-respected` | Invariant: game servers don't exceed max sessions |
-| `fleet-returns-valid-sessions` | Invariant: fleet only returns successfully created sessions |
-
-**Connections:**
-- `session-capacity-respected` is enforced by the game server; `fleet-returns-valid-sessions` is enforced by the fleet client. Together they ensure sessions are correctly allocated.
-- Both feed into `game-terminates` — if sessions are incorrectly allocated, games may not start correctly.
-
-## Standalone Properties
-
-| Property | Reason |
-|----------|--------|
-| `evil-behavior-exercised` | Pure reachability coverage — ensures the adversarial workload exercises all evil behavior paths. Not tied to a specific correctness cluster. |
+These are exploration hints rather than correctness properties. They share no code paths with each other but guide Antithesis toward interesting regions of the state space.
 
 ## Cross-Cluster Dependencies
 
-- **Result Integrity -> ELO Correctness**: `no-duplicate-result-application` is a prerequisite for all ELO properties.
-- **Matchmaking Lifecycle -> Game Protocol**: `matched-players-removed-from-queue` prevents scenarios that would violate `session-always-two-players`.
-- **Connection Management -> Game Protocol**: `reconnect-preserves-player-assignment` and `third-player-rejected` protect the assumptions of `turn-alternation`.
-- **System Recovery -> Matchmaking Lifecycle**: `fleet-recovery-after-backoff` ensures the matchmaking system can create new sessions.
-- **Server Capacity -> System Recovery**: `session-capacity-respected` prevents resource exhaustion that could impair recovery.
+| Upstream | Downstream | Relationship |
+|----------|-----------|--------------|
+| Cluster 1 (Game Rules) | Cluster 2 (ELO) | Correct winners feed correct ELO updates |
+| Cluster 3 (Session Lifecycle) | Cluster 2 (ELO) | Results must be reported for ELO to update |
+| Cluster 4 (Matchmaking) | Cluster 3 (Session Lifecycle) | Matches create sessions |
+| Cluster 5 (Connection) | Cluster 3 (Session Lifecycle) | Connected players needed for normal game completion |
+| Cluster 6 (System Recovery) | Cluster 4 (Matchmaking) | Recovery restores matchmaking ability |
+| Cluster 7 (Reachability) | All clusters | Exploration hints improve coverage of all other clusters |
+
+## Suspected Dominance
+
+- `no-double-elo-update` likely implies `elo-zero-sum` (if each result is processed once, and CalcElo is zero-sum, then the overall ELO changes are zero-sum).
+- `leaderboard-reflects-games` is the global check that catches failures missed by per-transaction properties.
+- `session-eventually-completes` partially implies `session-cleanup-complete` (completion triggers cleanup, though cleanup could still fail independently).
+- `protocol-not-blocked` is a prerequisite for `session-eventually-completes` (a blocked protocol goroutine prevents timer processing).

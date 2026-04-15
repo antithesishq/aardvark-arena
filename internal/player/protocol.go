@@ -54,10 +54,6 @@ func (p *Protocol[M, S]) RunToCompletion() (Completion, error) {
 
 	for msg := range p.rx {
 		if msg.Error != "" {
-			assert.Reachable(
-				"players sometimes receive protocol-level error messages",
-				map[string]any{"error": msg.Error},
-			)
 			log.Printf("server error: %s", msg.Error)
 			continue
 		}

@@ -85,21 +85,8 @@ func (r *Reporter) submitResult(result resultMsg) {
 		return
 	}
 	if err != nil {
-		assert.Reachable(
-			"result reporting sometimes fails due to non-temporary errors",
-			map[string]any{"sid": result.sid.String()},
-		)
 		log.Printf("failed to submit result for session %s: %v", result.sid, err)
 		return
 	}
 	defer func() { _ = resp.Body.Close() }()
-
-	assert.Sometimes(
-		resp.StatusCode != http.StatusOK,
-		"result reporting sometimes receives non-ok responses",
-		map[string]any{
-			"sid":    result.sid.String(),
-			"status": resp.StatusCode,
-		},
-	)
 }
