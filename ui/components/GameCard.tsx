@@ -111,6 +111,7 @@ export function GameCard({ session, serverUrl, elapsedSeconds }: Props) {
                 style={mono}
                 onClick={handleCancel}
                 disabled={cancelling}
+                data-testid="cancel-btn"
               >
                 {cancelling ? "Cancelling…" : "Cancel"}
               </Button>

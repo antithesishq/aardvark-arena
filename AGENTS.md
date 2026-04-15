@@ -14,3 +14,10 @@ Go project for educational purposes. Keep code simple and clean.
 - Next.js + React + TypeScript + Tailwind + shadcn/ui
 - `cd ui && npm install && npm run dev` — start dev server
 - `cd ui && npm run build` — production build
+
+## UI property tests (Bombadil)
+
+- `cd ui && npm run bombadil` — headless run (1 min, exits on first violation)
+- `cd ui && npm run bombadil:headed` — headed run for debugging
+- `ui/chrome/chrome-wrapper.sh` auto-installs and runs Chrome for Testing, passing arguments transparently
+- Spec lives in `ui/bombadil.spec.ts`

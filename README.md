@@ -28,7 +28,7 @@ The repo includes a `Procfile` that starts all services — matchmaker, two game
 hivemind
 ```
 
-Open http://localhost:3000 to see the dashboard. Games should start appearing within a few seconds.
+Open http://localhost:8000 to see the dashboard. Games should start appearing within a few seconds.
 
 ### Run manually
 
@@ -50,7 +50,7 @@ cd ui && npm install && npm run dev
 go run ./cmd/swarm -n 7 -move-delay 500ms
 ```
 
-Open http://localhost:3000 to see the dashboard. You can also run `go run ./cmd/player` to launch a single player if you prefer.
+Open http://localhost:8000 to see the dashboard. You can also run `go run ./cmd/player` to launch a single player if you prefer.
 
 ## Project structure
 
