@@ -198,6 +198,27 @@ const isLoading = extract((state) => {
   return state.document.querySelector("nav") === null;
 });
 
+// Scrollable containers whose visible height is less than 200px.
+const tinyScrollContainers = extract((state) => {
+  const all = state.document.querySelectorAll<HTMLElement>("*");
+  const out: { tag: string; height: number }[] = [];
+  for (const el of Array.from(all)) {
+    const style = state.window.getComputedStyle(el);
+    const ov = style.overflowY;
+    if (ov !== "auto" && ov !== "scroll") {
+      continue;
+    }
+    if (el.scrollHeight <= el.clientHeight) {
+      continue;
+    }
+    const r = el.getBoundingClientRect();
+    if (r.height > 0 && r.height < 200) {
+      out.push({ tag: el.tagName.toLowerCase(), height: Math.round(r.height) });
+    }
+  }
+  return out;
+});
+
 // ============================================================
 // Properties
 // ============================================================
@@ -252,6 +273,15 @@ export const serverRecoversAfterEnable = always(() => {
   return eventually(
     () => (activeSessionCount.current ?? 0) > 0 || !serverIsEnabled.current,
   ).within(30, "seconds");
+});
+
+// Property 4 – No tiny scroll containers.
+//
+// Scrollable containers with a visible height under 200px are poor UX —
+// they create cramped, hard-to-use scroll regions. This should never
+// appear in any page state.
+export const noTinyScrollContainers = always(() => {
+  return tinyScrollContainers.current.length === 0;
 });
 
 // ============================================================
