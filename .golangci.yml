@@ -6,3 +6,6 @@ linters:
     - godoclint
     - godot
     - revive
+  exclusions:
+    paths:
+      - ui/node_modules

@@ -118,7 +118,7 @@ func TestTicTacToeMoveProperties(t *testing.T) {
 
 		// Make a few random valid moves to get to an interesting state
 		nMoves := hegel.Draw(ht, hegel.Integers[int](0, 8))
-		for i := 0; i < nMoves; i++ {
+		for range nMoves {
 			if state.Status != Active {
 				break
 			}
@@ -166,7 +166,7 @@ func TestTicTacToeMoveProperties(t *testing.T) {
 		session := &TicTacToeSession{}
 
 		nMoves := hegel.Draw(ht, hegel.Integers[int](0, 7))
-		for i := 0; i < nMoves; i++ {
+		for range nMoves {
 			if state.Status != Active {
 				break
 			}
@@ -225,7 +225,7 @@ func TestConnect4GravityProperty(t *testing.T) {
 
 		// Make a sequence of random valid moves
 		nMoves := hegel.Draw(ht, hegel.Integers[int](0, 30))
-		for i := 0; i < nMoves; i++ {
+		for range nMoves {
 			if state.Status != Active {
 				break
 			}
@@ -270,7 +270,7 @@ func TestConnect4GravityProperty(t *testing.T) {
 		}
 
 		// All rows below should be occupied
-		for r := 0; r < expectedRow; r++ {
+		for r := range expectedRow {
 			if newState.Shared.Cells[col][r] == nil {
 				ht.Fatalf("row %d below piece in col %d is empty (gravity violated)", r, col)
 			}
@@ -283,7 +283,7 @@ func TestConnect4GravityProperty(t *testing.T) {
 
 		// Fill a random column
 		col := hegel.Draw(ht, hegel.Integers[int](0, 6))
-		for row := 0; row < 6; row++ {
+		for row := range 6 {
 			p := Player(row % 2)
 			state.Shared.Cells[col][row] = &p
 		}
