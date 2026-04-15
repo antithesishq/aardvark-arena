@@ -13,19 +13,27 @@ const R = 147;
 const POLL_INTERVAL_MS = 3000;
 
 function dotRadius(n: number) {
-  if (n <= 16) return 5;
+  if (n <= 16) {
+    return 5;
+  }
   return Math.max(1.875, 5 - (n - 16) * 0.15);
 }
 
 function dotFill(waitSeconds: number) {
-  if (waitSeconds < 60) return "#8b5cf6";
-  if (waitSeconds < 120) return "#f59e0b";
+  if (waitSeconds < 60) {
+    return "#8b5cf6";
+  }
+  if (waitSeconds < 120) {
+    return "#f59e0b";
+  }
   return "#ef4444";
 }
 
 /** Find the midpoint of the largest angular gap among existing points. */
 function findBestAngle(occupied: number[]): number {
-  if (occupied.length === 0) return -Math.PI / 2; // top of circle
+  if (occupied.length === 0) {
+    return -Math.PI / 2;
+  } // top of circle
   const sorted = [...occupied].sort((a, b) => a - b);
   let bestGap = 0;
   let bestMid = -Math.PI / 2;
@@ -39,7 +47,9 @@ function findBestAngle(occupied: number[]): number {
       bestMid = curr + gap / 2;
     }
   }
-  if (bestMid > Math.PI) bestMid -= 2 * Math.PI;
+  if (bestMid > Math.PI) {
+    bestMid -= 2 * Math.PI;
+  }
   return bestMid;
 }
 
@@ -63,8 +73,11 @@ export function PlayerQueueRing({ queue, avgWait }: Props) {
     tickDelay: 200,
   });
 
-  const [, setRenderTick] = useState(0);
-  const rerender = useCallback(() => setRenderTick((n) => n + 1), []);
+  const [players, setPlayers] = useState<DisplayPlayer[]>([]);
+  const rerender = useCallback(() => {
+    setPlayers([...ring.current.displayed.values()]);
+  }, []);
+  const processOneRef = useRef<() => void>(null!);
 
   // Process one pending addition or removal per tick.
   const processOne = useCallback(() => {
@@ -81,7 +94,9 @@ export function PlayerQueueRing({ queue, avgWait }: Props) {
     } else if (s.pendingAdds.length > 0) {
       const player = s.pendingAdds.shift()!;
       if (!s.displayed.has(player.player_id)) {
-        const angle = findBestAngle([...s.displayed.values()].map(d => d.angle));
+        const angle = findBestAngle(
+          [...s.displayed.values()].map((d) => d.angle),
+        );
         s.displayed.set(player.player_id, { player, angle });
         rerender();
       }
@@ -90,9 +105,12 @@ export function PlayerQueueRing({ queue, avgWait }: Props) {
     const remainingTicks =
       Math.ceil(s.pendingRemoves.length / 2) + s.pendingAdds.length;
     if (remainingTicks > 0) {
-      s.tickTimer = setTimeout(processOne, s.tickDelay);
+      s.tickTimer = setTimeout(() => processOneRef.current(), s.tickDelay);
     }
   }, [rerender]);
+  useEffect(() => {
+    processOneRef.current = processOne;
+  }, [processOne]);
 
   // Diff incoming queue vs current ring state on every poll.
   useEffect(() => {
@@ -130,8 +148,12 @@ export function PlayerQueueRing({ queue, avgWait }: Props) {
     // Drop pending adds for players that left the queue before being shown.
     s.pendingAdds = s.pendingAdds.filter((p) => incomingIds.has(p.player_id));
 
-    if (newPlayers.length > 0) s.pendingAdds.push(...newPlayers);
-    if (departed.length > 0) s.pendingRemoves.push(...departed);
+    if (newPlayers.length > 0) {
+      s.pendingAdds.push(...newPlayers);
+    }
+    if (departed.length > 0) {
+      s.pendingRemoves.push(...departed);
+    }
 
     // Update wait_seconds (and therefore color) for visible players.
     let changed = false;
@@ -142,7 +164,9 @@ export function PlayerQueueRing({ queue, avgWait }: Props) {
         changed = true;
       }
     }
-    if (changed) rerender();
+    if (changed) {
+      rerender();
+    }
 
     // Kick off the ticker if there's pending work.
     const totalTicks =
@@ -156,12 +180,14 @@ export function PlayerQueueRing({ queue, avgWait }: Props) {
   }, [queue, processOne, rerender]);
 
   useEffect(() => {
+    const r = ring.current;
     return () => {
-      if (ring.current.tickTimer) clearTimeout(ring.current.tickTimer);
+      if (r.tickTimer) {
+        clearTimeout(r.tickTimer);
+      }
     };
   }, []);
 
-  const players = [...ring.current.displayed.values()];
   const n = players.length;
   const dr = dotRadius(n);
 
@@ -177,8 +203,12 @@ export function PlayerQueueRing({ queue, avgWait }: Props) {
           </div>
         </div>
         {avgWait && (
-          <div className="text-xs text-zinc-400" style={{ ...geist, fontVariantNumeric: "tabular-nums" }}>
-            avg wait <span className="text-zinc-200 font-medium">{avgWait}</span>
+          <div
+            className="text-xs text-zinc-400"
+            style={{ ...geist, fontVariantNumeric: "tabular-nums" }}
+          >
+            avg wait{" "}
+            <span className="text-zinc-200 font-medium">{avgWait}</span>
           </div>
         )}
       </div>
@@ -238,7 +268,10 @@ export function PlayerQueueRing({ queue, avgWait }: Props) {
         {/* center disk with queue stats */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
           <div className="flex flex-col items-center justify-center w-24 h-24 rounded-full bg-zinc-900 border border-zinc-700">
-            <span className="text-2xl font-semibold text-zinc-200" style={geist}>
+            <span
+              className="text-2xl font-semibold text-zinc-200"
+              style={geist}
+            >
               {n}
             </span>
             <span className="text-xs text-zinc-500" style={geist}>

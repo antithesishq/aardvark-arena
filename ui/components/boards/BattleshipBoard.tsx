@@ -5,7 +5,10 @@
 type AttackResult = 0 | 1;
 
 interface BattleshipShared {
-  Attacks: { P1: Record<string, AttackResult>; P2: Record<string, AttackResult> };
+  Attacks: {
+    P1: Record<string, AttackResult>;
+    P2: Record<string, AttackResult>;
+  };
 }
 
 interface Props {
@@ -15,7 +18,13 @@ interface Props {
 const COLS = 10;
 const ROWS = 10;
 
-function MiniGrid({ attacks, label }: { attacks: Record<string, AttackResult>; label: string }) {
+function MiniGrid({
+  attacks,
+  label,
+}: {
+  attacks: Record<string, AttackResult>;
+  label: string;
+}) {
   return (
     <div className="flex flex-col items-center gap-1 flex-1">
       <div
@@ -35,15 +44,17 @@ function MiniGrid({ attacks, label }: { attacks: Record<string, AttackResult>; l
                     attack === 1
                       ? "#ef4444" // hit = red
                       : attack === 0
-                      ? "#6b7280" // miss = gray
-                      : "#1e293b", // empty = slate
+                        ? "#6b7280" // miss = gray
+                        : "#1e293b", // empty = slate
                 }}
               />
             );
-          })
+          }),
         )}
       </div>
-      <span className="text-[8px] text-zinc-500 uppercase tracking-widest">{label}</span>
+      <span className="text-[8px] text-zinc-500 uppercase tracking-widest">
+        {label}
+      </span>
     </div>
   );
 }

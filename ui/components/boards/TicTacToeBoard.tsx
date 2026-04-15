@@ -13,7 +13,13 @@ export function TicTacToeBoard({ shared }: Props) {
   const cells = shared.Cells;
 
   return (
-    <div className="inline-grid gap-px bg-zinc-700 rounded overflow-hidden" style={{ gridTemplateColumns: "repeat(3, 3rem)", gridTemplateRows: "repeat(3, 3rem)" }}>
+    <div
+      className="inline-grid gap-px bg-zinc-700 rounded overflow-hidden"
+      style={{
+        gridTemplateColumns: "repeat(3, 3rem)",
+        gridTemplateRows: "repeat(3, 3rem)",
+      }}
+    >
       {[0, 1, 2].map((row) =>
         [0, 1, 2].map((col) => {
           const val = cells[col]?.[row];
@@ -26,7 +32,7 @@ export function TicTacToeBoard({ shared }: Props) {
               {val === 1 && <span className="text-zinc-400">O</span>}
             </div>
           );
-        })
+        }),
       )}
     </div>
   );

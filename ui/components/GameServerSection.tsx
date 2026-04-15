@@ -24,27 +24,44 @@ export interface ServerHealth {
 
 interface Props {
   serverUrl: string;
-  label: string;
   hidden?: boolean;
   onHealthChange?: (health: ServerHealth) => void;
 }
 
-export function GameServerSection({ serverUrl, label, hidden, onHealthChange }: Props) {
+export function GameServerSection({
+  serverUrl,
+  hidden,
+  onHealthChange,
+}: Props) {
   const [connected, setConnected] = useState(false);
-  const [health, setHealth] = useState<{ active: number; max: number; serverActive: boolean } | null>(null);
-  const [sessions, setSessions] = useState<Map<string, SessionState>>(new Map());
+  const [health, setHealth] = useState<{
+    active: number;
+    max: number;
+    serverActive: boolean;
+  } | null>(null);
+  const [sessions, setSessions] = useState<Map<string, SessionState>>(
+    new Map(),
+  );
   const [startTimes, setStartTimes] = useState<Record<string, number>>({});
 
   // Linger tracking for ended sessions
-  const lingerTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const lingerTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  );
 
   const handleEvent = useCallback((evt: WatchEvent) => {
     if (evt.type === "health") {
-      setHealth({ active: evt.active_sessions, max: evt.max_sessions, serverActive: evt.active });
+      setHealth({
+        active: evt.active_sessions,
+        max: evt.max_sessions,
+        serverActive: evt.active,
+      });
     } else if (evt.type === "session") {
       // Ignore updates for sessions already ending — prevents race where a
       // late "session" event cancels the linger timer and the card sticks.
-      if (lingerTimers.current.has(evt.session_id)) return;
+      if (lingerTimers.current.has(evt.session_id)) {
+        return;
+      }
 
       setSessions((prev) => {
         const next = new Map(prev);
@@ -69,7 +86,8 @@ export function GameServerSection({ serverUrl, label, hidden, onHealthChange }: 
           return next;
         });
         setStartTimes((prev) => {
-          const { [evt.session_id]: _, ...rest } = prev;
+          const rest = { ...prev };
+          delete rest[evt.session_id];
           return rest;
         });
       }, LINGER_MS);
@@ -78,21 +96,26 @@ export function GameServerSection({ serverUrl, label, hidden, onHealthChange }: 
   }, []);
 
   useEffect(() => {
+    const timers = lingerTimers.current;
     const cleanup = watchServer(serverUrl, handleEvent, (conn) => {
       if (conn) {
         // Clear stale sessions on (re)connect — server will re-send active ones
         setSessions(new Map());
         setStartTimes({});
-        for (const t of lingerTimers.current.values()) clearTimeout(t);
-        lingerTimers.current.clear();
+        for (const t of timers.values()) {
+          clearTimeout(t);
+        }
+        timers.clear();
       }
       setConnected(conn);
     });
     return () => {
       cleanup();
       // Clear all linger timers on unmount
-      for (const t of lingerTimers.current.values()) clearTimeout(t);
-      lingerTimers.current.clear();
+      for (const t of timers.values()) {
+        clearTimeout(t);
+      }
+      timers.clear();
     };
   }, [serverUrl, handleEvent]);
 
@@ -107,23 +130,33 @@ export function GameServerSection({ serverUrl, label, hidden, onHealthChange }: 
     });
   }, [connected, health, onHealthChange]);
 
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(0);
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
+    const tick = () => setNow(Date.now());
+    tick();
+    const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, []);
 
   const sorted = useMemo(
-    () => Array.from(sessions.values()).sort((a, b) => (startTimes[a.session_id] ?? 0) - (startTimes[b.session_id] ?? 0)),
+    () =>
+      Array.from(sessions.values()).sort(
+        (a, b) =>
+          (startTimes[a.session_id] ?? 0) - (startTimes[b.session_id] ?? 0),
+      ),
     [sessions, startTimes],
   );
-  if (hidden) return null;
+  if (hidden) {
+    return null;
+  }
 
   return (
     <div>
       {/* Game cards */}
       {sorted.length === 0 ? (
-        <div className="text-xs text-zinc-400 py-8 text-center">No active sessions</div>
+        <div className="text-xs text-zinc-400 py-8 text-center">
+          No active sessions
+        </div>
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(288px,1fr))] gap-4">
           {sorted.map((s) => (
@@ -131,7 +164,9 @@ export function GameServerSection({ serverUrl, label, hidden, onHealthChange }: 
               key={s.session_id}
               session={s}
               serverUrl={serverUrl}
-              elapsedSeconds={Math.floor((now - (startTimes[s.session_id] ?? now)) / 1000)}
+              elapsedSeconds={Math.floor(
+                (now - (startTimes[s.session_id] ?? now)) / 1000,
+              )}
             />
           ))}
         </div>

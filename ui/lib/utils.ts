@@ -1,8 +1,8 @@
-import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 
 export const mono = { fontFamily: "var(--font-geist-mono)" };
@@ -17,6 +17,9 @@ export function fmtSeconds(s: number) {
 }
 
 export function serverHostname(url: string) {
-  try { return new URL(url).hostname.toUpperCase(); }
-  catch { return url; }
+  try {
+    return new URL(url).hostname.toUpperCase();
+  } catch {
+    return url;
+  }
 }

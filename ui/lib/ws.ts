@@ -5,7 +5,12 @@ export interface GameState {
 }
 
 export type WatchEvent =
-  | { type: "health"; active_sessions: number; max_sessions: number; active: boolean }
+  | {
+      type: "health";
+      active_sessions: number;
+      max_sessions: number;
+      active: boolean;
+    }
   | {
       type: "session";
       session_id: string;
@@ -31,7 +36,9 @@ export function watchServer(
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   function connect() {
-    if (stopped) return;
+    if (stopped) {
+      return;
+    }
     const wsUrl = serverUrl.replace(/^http/, "ws") + "/watch";
     ws = new WebSocket(wsUrl);
 
@@ -61,7 +68,9 @@ export function watchServer(
 
   return () => {
     stopped = true;
-    if (reconnectTimer) clearTimeout(reconnectTimer);
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+    }
     ws?.close();
   };
 }

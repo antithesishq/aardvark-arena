@@ -1,0 +1,22 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default: 3
+
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default: 3
+
+  - package-ecosystem: npm
+    directory: /ui
+    schedule:
+      interval: weekly
+    cooldown:
+      default: 3
