@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antithesishq/aardvark-arena/internal"
 	"github.com/antithesishq/aardvark-arena/internal/game"
 	"github.com/google/uuid"
 	"hegel.dev/go/hegel"
@@ -24,7 +23,7 @@ func MustDB(t *testing.T) *DB {
 
 func TestMatchQueueSanity(t *testing.T) {
 	t.Run("queue returns nil before match", func(t *testing.T) {
-		fleet := NewFleet(internal.NilToken, 5*time.Minute)
+		fleet := NewFleet(5 * time.Minute)
 		q := NewMatchQueue(fleet, MustDB(t))
 
 		session, err := q.Queue(&PlayerModel{
@@ -46,7 +45,7 @@ func TestMatchQueueSanity(t *testing.T) {
 		defer srv.Close()
 
 		u, _ := url.Parse(srv.URL)
-		fleet := NewFleet(internal.NilToken, 5*time.Minute)
+		fleet := NewFleet(5 * time.Minute)
 		fleet.Register(uuid.New(), *u)
 		q := NewMatchQueue(fleet, MustDB(t))
 
@@ -81,7 +80,7 @@ func TestMatchQueueSanity(t *testing.T) {
 	})
 
 	t.Run("elo too far apart not matched", func(t *testing.T) {
-		fleet := NewFleet(internal.NilToken, 5*time.Minute)
+		fleet := NewFleet(5 * time.Minute)
 		q := NewMatchQueue(fleet, MustDB(t))
 
 		p1 := &PlayerModel{PlayerID: uuid.New(), Elo: 1000}

@@ -25,7 +25,6 @@ type Config struct {
 	ID            uuid.UUID
 	TurnTimeout   time.Duration
 	MaxSessions   int
-	Token         internal.Token
 	MatchmakerURL *url.URL
 	SelfURL       *url.URL
 }
@@ -47,7 +46,7 @@ func New(ctx context.Context, cfg Config) *Server {
 		cfg:      cfg,
 		mux:      http.NewServeMux(),
 		sessions: NewSessionManager(cfg, resultCh),
-		reporter: NewReporter(resultCh, cfg.Token, cfg.MatchmakerURL),
+		reporter: NewReporter(resultCh, cfg.MatchmakerURL),
 		client:   internal.NewHTTPClient(),
 	}
 	s.routes()
@@ -62,7 +61,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET /health", s.handleHealth)
-	s.mux.HandleFunc("PUT /session/{sid}", internal.TokenAuth(s.cfg.Token, s.handleCreateSession))
+	s.mux.HandleFunc("PUT /session/{sid}", s.handleCreateSession)
 	s.mux.HandleFunc("/session/{sid}/{pid}", s.handleSessionConnect)
 	s.mux.HandleFunc("GET /sessions", s.handleListSessions)
 	s.mux.HandleFunc("GET /session/{sid}/watch", s.handleWatchSession)
@@ -278,9 +277,6 @@ func (s *Server) register() bool {
 		return false
 	}
 	req.Header.Set("Content-Type", "application/json")
-	if !s.cfg.Token.IsNil() {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.cfg.Token.String()))
-	}
 	resp, err := s.client.Do(req)
 	if err != nil {
 		log.Printf("register: failed to contact matchmaker: %v", err)

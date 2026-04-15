@@ -11,9 +11,25 @@ Go project for educational purposes. Keep code simple and clean.
 
 ## Frontend (ui/)
 
-- Next.js + React + TypeScript + Tailwind + shadcn/ui
+- React + Next.js (App Router), TypeScript, Tailwind, shadcn/ui
+- No custom utility fns if a library already does it — prefer idiomatic deps
 - `cd ui && npm install && npm run dev` — start dev server
 - `cd ui && npm run build` — production build
+
+### Conventions
+- Optimize for readability over production-readiness
+- Simple > clever. If two approaches exist, pick the shorter one
+- Components live in ui/components/, boards in ui/components/boards/
+- API calls in ui/lib/api.ts, WebSocket logic in ui/lib/ws.ts
+
+### API targets
+- Matchmaker: polls /status and /leaderboard
+- Game servers: /sessions list + /session/{sid}/watch WebSocket (spectator, read-only)
+- CORS is open (Access-Control-Allow-Origin: *) on all backend endpoints
+
+### Style
+- shadcn/ui for UI primitives (Button, Select)
+- Tailwind for layout/spacing/styling, no custom CSS files besides globals.css
 
 ## UI property tests (Bombadil)
 

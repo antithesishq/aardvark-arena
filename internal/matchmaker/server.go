@@ -27,9 +27,6 @@ type Config struct {
 	// How frequently will the database be checked for expired sessions
 	SessionMonitorInterval time.Duration
 
-	// Token authenticates requests to/from game servers.
-	Token internal.Token
-
 	// DatabasePath is the path to the SQLite database file.
 	DatabasePath string
 }
@@ -50,7 +47,7 @@ func New(ctx context.Context, cfg Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	fleet := NewFleet(cfg.Token, cfg.SessionTimeout)
+	fleet := NewFleet(cfg.SessionTimeout)
 	s := &Server{
 		cfg:   cfg,
 		mux:   http.NewServeMux(),
@@ -72,12 +69,12 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /health", s.handleHealth)
 	s.mux.HandleFunc("PUT /queue/{pid}", s.handleQueue)
 	s.mux.HandleFunc("DELETE /queue/{pid}", s.handleUnqueue)
-	s.mux.HandleFunc("PUT /results/{sid}", internal.TokenAuth(s.cfg.Token, s.handleResult))
+	s.mux.HandleFunc("PUT /results/{sid}", s.handleResult)
 	s.mux.HandleFunc("GET /status", s.handleStatus)
 	s.mux.HandleFunc("GET /leaderboard", s.handleLeaderboard)
 	s.mux.HandleFunc("DELETE /session/{sid}", s.handleCancelSession)
 	s.mux.HandleFunc("GET /servers", s.handleServers)
-	s.mux.HandleFunc("POST /servers/register", internal.TokenAuth(s.cfg.Token, s.handleRegister))
+	s.mux.HandleFunc("POST /servers/register", s.handleRegister)
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {

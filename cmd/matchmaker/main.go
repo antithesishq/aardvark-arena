@@ -10,7 +10,6 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/antithesishq/aardvark-arena/internal"
 	"github.com/antithesishq/aardvark-arena/internal/matchmaker"
 
 	"github.com/antithesishq/antithesis-sdk-go/assert"
@@ -27,8 +26,6 @@ func main() {
 	sessionTimeout := flag.Duration("session-timeout", DefaultSessionTimeout, "duration after which unfinished sessions are cancelled")
 	matchInterval := flag.Duration("match-interval", DefaultMatchInterval, "interval between checking the match queue")
 	sessionMonitorInterval := flag.Duration("monitor-interval", DefaultSessionMonitorInterval, "interval between checking for expired sessions")
-	var token internal.Token
-	flag.Var(&token, "token", "token for authenticating gameserver requests")
 	databasePath := flag.String("db-path", ":memory:", "path to the SQLite database")
 	flag.Parse()
 
@@ -41,7 +38,6 @@ func main() {
 		SessionTimeout:         *sessionTimeout,
 		MatchInterval:          *matchInterval,
 		SessionMonitorInterval: *sessionMonitorInterval,
-		Token:                  token,
 		DatabasePath:           *databasePath,
 	}
 	srv, err := matchmaker.New(ctx, cfg)

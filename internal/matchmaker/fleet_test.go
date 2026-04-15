@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antithesishq/aardvark-arena/internal"
 	"github.com/antithesishq/aardvark-arena/internal/game"
 	"github.com/google/uuid"
 )
@@ -23,7 +22,7 @@ func TestFleetSanity(t *testing.T) {
 		defer srv.Close()
 
 		u, _ := url.Parse(srv.URL)
-		fleet := NewFleet(internal.NilToken, 5*time.Minute)
+		fleet := NewFleet(5 * time.Minute)
 		fleet.Register(uuid.New(), *u)
 
 		info, err := fleet.CreateSession(game.TicTacToe)
@@ -53,7 +52,7 @@ func TestFleetSanity(t *testing.T) {
 		u, _ := url.Parse(srv.URL)
 		// Two entries pointing at the same test server so the fleet has a
 		// second candidate after the first returns 503.
-		fleet := NewFleet(internal.NilToken, 5*time.Minute)
+		fleet := NewFleet(5 * time.Minute)
 		fleet.Register(uuid.New(), *u)
 		fleet.Register(uuid.New(), *u)
 
@@ -73,7 +72,7 @@ func TestFleetSanity(t *testing.T) {
 		defer srv.Close()
 
 		u, _ := url.Parse(srv.URL)
-		fleet := NewFleet(internal.NilToken, 5*time.Minute)
+		fleet := NewFleet(5 * time.Minute)
 		fleet.Register(uuid.New(), *u)
 
 		_, err := fleet.CreateSession(game.TicTacToe)
@@ -83,7 +82,7 @@ func TestFleetSanity(t *testing.T) {
 	})
 
 	t.Run("no servers registered", func(t *testing.T) {
-		fleet := NewFleet(internal.NilToken, 5*time.Minute)
+		fleet := NewFleet(5 * time.Minute)
 
 		_, err := fleet.CreateSession(game.TicTacToe)
 		if err != ErrNoServersAvailable {
@@ -99,7 +98,7 @@ func TestFleetSanity(t *testing.T) {
 
 		u, _ := url.Parse(srv.URL)
 		id := uuid.New()
-		fleet := NewFleet(internal.NilToken, 5*time.Minute)
+		fleet := NewFleet(5 * time.Minute)
 		fleet.Register(id, *u)
 
 		// Drive the server into retryAt by getting a 503.
