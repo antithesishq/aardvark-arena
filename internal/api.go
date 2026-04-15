@@ -3,11 +3,9 @@ package internal
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 
 	"github.com/google/uuid"
 )
@@ -22,58 +20,6 @@ func ShortID(id uuid.UUID) string {
 
 // SessionID identifies a game session.
 type SessionID = uuid.UUID
-
-// Token authenticates API requests.
-type Token uuid.UUID
-
-// NilToken is the zero-value token.
-var NilToken = Token(uuid.Nil)
-
-// IsNil returns true if the token is nil or the zero UUID.
-func (t *Token) IsNil() bool {
-	return t == nil || *t == NilToken
-}
-
-// String returns the string representation of the token.
-func (t *Token) String() string {
-	return uuid.UUID(*t).String()
-}
-
-// Set parses a UUID string and sets the token value.
-func (t *Token) Set(val string) error {
-	parsed, err := uuid.Parse(val)
-	if err != nil {
-		return err
-	}
-	*t = Token(parsed)
-	return nil
-}
-
-// TokenAuth wraps a handler with token authentication.
-// If token is all zeros, authentication is skipped.
-func TokenAuth(token Token, next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if token.IsNil() {
-			next(w, r)
-			return
-		}
-		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" {
-			WriteError(w, http.StatusUnauthorized, errors.New("missing authorization header"))
-			return
-		}
-		provided, found := strings.CutPrefix(authHeader, "Bearer ")
-		if !found {
-			WriteError(w, http.StatusUnauthorized, errors.New("invalid authorization header"))
-			return
-		}
-		if provided != token.String() {
-			WriteError(w, http.StatusUnauthorized, errors.New("invalid token"))
-			return
-		}
-		next(w, r)
-	}
-}
 
 // WriteError writes an error response with the given status code.
 func WriteError(w http.ResponseWriter, status int, err error) {
@@ -124,7 +70,7 @@ func CORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return

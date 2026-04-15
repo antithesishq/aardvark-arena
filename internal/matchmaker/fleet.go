@@ -30,7 +30,6 @@ type Fleet struct {
 	mu             sync.Mutex
 	servers        []*server
 	client         *http.Client
-	token          internal.Token
 	sessionTimeout time.Duration
 	rng            *rand.Rand
 }
@@ -46,10 +45,9 @@ type server struct {
 }
 
 // NewFleet creates an empty Fleet. Game servers join via Register.
-func NewFleet(token internal.Token, sessionTimeout time.Duration) *Fleet {
+func NewFleet(sessionTimeout time.Duration) *Fleet {
 	return &Fleet{
 		client:         internal.NewHTTPClient(),
-		token:          token,
 		sessionTimeout: sessionTimeout,
 		rng:            internal.NewRand(),
 	}
@@ -154,9 +152,6 @@ func (f *Fleet) CreateSession(kind game.Kind) (*SessionInfo, error) {
 			return nil, err
 		}
 		req.Header.Set("Content-Type", "application/json")
-		if !f.token.IsNil() {
-			req.Header.Set("Authorization", "Bearer "+f.token.String())
-		}
 		resp, err := f.client.Do(req)
 		if internal.HTTPIsTemporary(err) {
 			assert.Reachable(

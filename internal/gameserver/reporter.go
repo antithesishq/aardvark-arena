@@ -3,7 +3,6 @@ package gameserver
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"net/url"
@@ -16,16 +15,14 @@ import (
 // Reporter sends results back to the matchmaker.
 type Reporter struct {
 	resultCh      chan resultMsg
-	token         internal.Token
 	matchmakerURL *url.URL
 	client        *http.Client
 }
 
 // NewReporter creates a Reporter that sends results to the given matchmaker URL.
-func NewReporter(resultCh chan resultMsg, token internal.Token, matchmaker *url.URL) *Reporter {
+func NewReporter(resultCh chan resultMsg, matchmaker *url.URL) *Reporter {
 	return &Reporter{
 		resultCh:      resultCh,
-		token:         token,
 		matchmakerURL: matchmaker,
 		client:        internal.NewHTTPClient(),
 	}
@@ -72,9 +69,6 @@ func (r *Reporter) submitResult(result resultMsg) {
 		log.Panicf("failed to create request: %v", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	if !r.token.IsNil() {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", r.token.String()))
-	}
 	resp, err := r.client.Do(req)
 	if internal.HTTPIsTemporary(err) {
 		assert.Reachable(

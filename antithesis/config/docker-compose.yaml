@@ -1,7 +1,5 @@
 name: aardvark-arena
 
-x-auth-token: &auth-token "d4f5a1b2-0e3c-4a6d-9f8b-7c2e1d3a5b6f"
-
 services:
   matchmaker:
     container_name: aardvark-arena-matchmaker
@@ -20,8 +18,6 @@ services:
       - "-match-interval=100ms"
       - "-session-timeout=2m"
       - "-monitor-interval=1s"
-      - "-token"
-      - *auth-token
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
       interval: 2s
@@ -45,8 +41,6 @@ services:
       - "-matchmaker=http://aardvark-arena-matchmaker:8080"
       - "-turn-timeout=10s"
       - "-max-sessions=6"
-      - "-token"
-      - *auth-token
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8081/health"]
       interval: 2s
@@ -66,8 +60,6 @@ services:
       - "-matchmaker=http://aardvark-arena-matchmaker:8080"
       - "-turn-timeout=10s"
       - "-max-sessions=6"
-      - "-token"
-      - *auth-token
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8081/health"]
       interval: 2s
