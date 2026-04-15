@@ -15,6 +15,7 @@ export {
   noUnhandledPromiseRejections,
   noConsoleErrors,
 } from "@antithesishq/bombadil/defaults";
+import { navigation, scroll } from "@antithesishq/bombadil/defaults/actions";
 
 // ============================================================
 // Extractors
@@ -197,10 +198,6 @@ const isLoading = extract((state) => {
   return state.document.querySelector("nav") === null;
 });
 
-const canGoBack = extract((state) => {
-  return state.navigationHistory.back.length > 0;
-});
-
 // ============================================================
 // Properties
 // ============================================================
@@ -269,12 +266,10 @@ export const explore = actions(() => {
     return ["Wait" as Action];
   }
 
-  const center = { x: 512, y: 384 };
   const weightedActions: [number, Action | ActionGenerator][] = [
-    [6, "Wait"], // frequently pause so data has time to update
-    [2, "Reload"], // occasionally reload to exercise the polling path
-    [1, { ScrollDown: { origin: center, distance: 200 } }],
-    [1, { ScrollUp: { origin: center, distance: 200 } }],
+    [2, "Wait"], 
+    [2, scroll],
+    [1, navigation],
   ];
 
   // Cancel active game cards.
@@ -312,11 +307,6 @@ export const explore = actions(() => {
         },
       },
     ]);
-  }
-
-  // Go back if there is history.
-  if (canGoBack.current) {
-    weightedActions.push([1, "Back"]);
   }
 
   // Open the server select dropdown.
