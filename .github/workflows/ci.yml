@@ -10,8 +10,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  skip-check:
+    runs-on: ubuntu-24.04
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+    steps:
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@f75f66ce1886f00957d99748a42c724f4330bdcf # v5
+        with:
+          paths_ignore: '["**.md"]'
+
   go:
     name: Go
+    needs: skip-check
+    if: needs.skip-check.outputs.should_skip != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -31,6 +43,8 @@ jobs:
 
   ui:
     name: UI
+    needs: skip-check
+    if: needs.skip-check.outputs.should_skip != 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
