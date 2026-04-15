@@ -24,12 +24,11 @@ export interface ServerHealth {
 
 interface Props {
   serverUrl: string;
-  label: string;
   hidden?: boolean;
   onHealthChange?: (health: ServerHealth) => void;
 }
 
-export function GameServerSection({ serverUrl, label, hidden, onHealthChange }: Props) {
+export function GameServerSection({ serverUrl, hidden, onHealthChange }: Props) {
   const [connected, setConnected] = useState(false);
   const [health, setHealth] = useState<{ active: number; max: number; serverActive: boolean } | null>(null);
   const [sessions, setSessions] = useState<Map<string, SessionState>>(new Map());
@@ -44,7 +43,7 @@ export function GameServerSection({ serverUrl, label, hidden, onHealthChange }: 
     } else if (evt.type === "session") {
       // Ignore updates for sessions already ending — prevents race where a
       // late "session" event cancels the linger timer and the card sticks.
-      if (lingerTimers.current.has(evt.session_id)) return;
+      if (lingerTimers.current.has(evt.session_id)) {return;}
 
       setSessions((prev) => {
         const next = new Map(prev);
@@ -69,7 +68,8 @@ export function GameServerSection({ serverUrl, label, hidden, onHealthChange }: 
           return next;
         });
         setStartTimes((prev) => {
-          const { [evt.session_id]: _, ...rest } = prev;
+          const rest = { ...prev };
+          delete rest[evt.session_id];
           return rest;
         });
       }, LINGER_MS);
@@ -78,21 +78,22 @@ export function GameServerSection({ serverUrl, label, hidden, onHealthChange }: 
   }, []);
 
   useEffect(() => {
+    const timers = lingerTimers.current;
     const cleanup = watchServer(serverUrl, handleEvent, (conn) => {
       if (conn) {
         // Clear stale sessions on (re)connect — server will re-send active ones
         setSessions(new Map());
         setStartTimes({});
-        for (const t of lingerTimers.current.values()) clearTimeout(t);
-        lingerTimers.current.clear();
+        for (const t of timers.values()) {clearTimeout(t);}
+        timers.clear();
       }
       setConnected(conn);
     });
     return () => {
       cleanup();
       // Clear all linger timers on unmount
-      for (const t of lingerTimers.current.values()) clearTimeout(t);
-      lingerTimers.current.clear();
+      for (const t of timers.values()) {clearTimeout(t);}
+      timers.clear();
     };
   }, [serverUrl, handleEvent]);
 
@@ -107,9 +108,11 @@ export function GameServerSection({ serverUrl, label, hidden, onHealthChange }: 
     });
   }, [connected, health, onHealthChange]);
 
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(0);
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
+    const tick = () => setNow(Date.now());
+    tick();
+    const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, []);
 
@@ -117,7 +120,7 @@ export function GameServerSection({ serverUrl, label, hidden, onHealthChange }: 
     () => Array.from(sessions.values()).sort((a, b) => (startTimes[a.session_id] ?? 0) - (startTimes[b.session_id] ?? 0)),
     [sessions, startTimes],
   );
-  if (hidden) return null;
+  if (hidden) {return null;}
 
   return (
     <div>

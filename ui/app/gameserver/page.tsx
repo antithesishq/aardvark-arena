@@ -51,7 +51,7 @@ export default function GameServerPage() {
     fetchServers()
       .then((s) => {
         setServers(s);
-        if (s.length > 0) setSelected(s[0].url);
+        if (s.length > 0) {setSelected(s[0].url);}
       })
       .catch((e) => setError(String(e)));
   }, []);
@@ -102,8 +102,8 @@ export default function GameServerPage() {
 
           {/* Health badge — always shows status */}
           {(() => {
-            if (!h) return null;
-            if (!h.connected) return <StatusBadge status="disconnected" label="OFFLINE" />;
+            if (!h) {return null;}
+            if (!h.connected) {return <StatusBadge status="disconnected" label="OFFLINE" />;}
             return <span data-testid="server-health" data-active={h.active}><StatusBadge status={h.degraded ? "full" : "connected"} label={`${h.active}/${h.max}`} /></span>;
           })()}
 
@@ -112,7 +112,7 @@ export default function GameServerPage() {
             <Toggle
               checked={h.enabled}
               onChange={(checked) => {
-                if (!selected) return;
+                if (!selected) {return;}
                 if (checked) {
                   activateServer(selected);
                 } else {
@@ -146,7 +146,7 @@ export default function GameServerPage() {
             const healths = Object.values(healthMap);
             const totalActive = healths.reduce((s, h) => s + (h.connected ? h.active : 0), 0);
             const totalMax = healths.reduce((s, h) => s + (h.connected ? h.max : 0), 0);
-            if (healths.length === 0) return null;
+            if (healths.length === 0) {return null;}
             return (
               <span className="text-xs text-zinc-400 flex items-center gap-3" style={mono}>
                 <span>
@@ -168,7 +168,6 @@ export default function GameServerPage() {
         <GameServerSection
           key={s.url}
           serverUrl={s.url}
-          label={serverLabel(s)}
           hidden={s.url !== selected}
           onHealthChange={(h) => handleHealthChange(s.url, h)}
         />

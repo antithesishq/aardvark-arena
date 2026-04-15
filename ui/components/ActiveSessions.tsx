@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ActiveSession, cancelSessionViaMatchmaker } from "@/lib/api";
 import { GameBadgeShort } from "./badges";
 import { Button } from "@/components/ui/button";
@@ -20,8 +20,8 @@ function CancelButton({ session, onRefresh }: { session: ActiveSession; onRefres
     setError(null);
     try {
       const res = await cancelSessionViaMatchmaker(session.session_id);
-      if (!res.ok) setError(`${res.status}`);
-      else onRefresh?.();
+      if (!res.ok) {setError(`${res.status}`);}
+      else {onRefresh?.();}
     } catch {
       setError("Network error");
     } finally {
@@ -50,7 +50,7 @@ function CancelAllButton({ sessions, onRefresh }: { sessions: ActiveSession[]; o
     onRefresh?.();
   }
 
-  if (sessions.length === 0) return null;
+  if (sessions.length === 0) {return null;}
 
   return (
     <Button size="sm" variant="destructive" style={mono} onClick={handleCancelAll} disabled={cancelling}
@@ -61,6 +61,14 @@ function CancelAllButton({ sessions, onRefresh }: { sessions: ActiveSession[]; o
 }
 
 export function ActiveSessions({ sessions, onRefresh }: Props) {
+  const [now, setNow] = useState(0);
+  useEffect(() => {
+    const tick = () => setNow(Date.now());
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, []);
+
   const sorted = [...sessions].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   return (
     <div className="bg-zinc-900/20 border border-zinc-800 rounded backdrop-blur-sm py-2 px-3 h-[350px] overflow-y-auto">
@@ -98,7 +106,7 @@ export function ActiveSessions({ sessions, onRefresh }: Props) {
               </td>
               <td className="py-2.5"><GameBadgeShort game={s.game} /></td>
               <td className="py-2.5 text-zinc-400 text-xs" style={mono}>{serverHostname(s.server)}:{new URL(s.server).port}</td>
-              <td className="py-2.5 text-xs text-zinc-300 tabular-nums" style={mono}>{fmtSeconds(Math.floor((Date.now() - new Date(s.created_at).getTime()) / 1000))}</td>
+              <td className="py-2.5 text-xs text-zinc-300 tabular-nums" style={mono}>{fmtSeconds(Math.floor((now - new Date(s.created_at).getTime()) / 1000))}</td>
               <td className="py-2.5 text-right">
                 <CancelButton session={s} onRefresh={onRefresh} />
               </td>

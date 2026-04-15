@@ -31,7 +31,7 @@ export function watchServer(
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   function connect() {
-    if (stopped) return;
+    if (stopped) {return;}
     const wsUrl = serverUrl.replace(/^http/, "ws") + "/watch";
     ws = new WebSocket(wsUrl);
 
@@ -61,7 +61,7 @@ export function watchServer(
 
   return () => {
     stopped = true;
-    if (reconnectTimer) clearTimeout(reconnectTimer);
+    if (reconnectTimer) {clearTimeout(reconnectTimer);}
     ws?.close();
   };
 }

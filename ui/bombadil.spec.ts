@@ -57,10 +57,10 @@ const cancelButtonPoints = extract((state) => {
   );
   const pts: number[][] = [];
   for (const btn of Array.from(buttons)) {
-    if (btn.textContent?.trim() !== "Cancel") continue;
+    if (btn.textContent?.trim() !== "Cancel") {continue;}
     const r = btn.getBoundingClientRect();
     if (r.width > 0 && r.height > 0)
-      pts.push([r.left + r.width / 2, r.top + r.height / 2]);
+      {pts.push([r.left + r.width / 2, r.top + r.height / 2]);}
   }
   return pts;
 });
@@ -70,17 +70,17 @@ const cancelButtonPoints = extract((state) => {
 // Centre-point of the enabled/disabled toggle (role="switch").
 const serverTogglePoint = extract((state) => {
   const el = state.document.getElementById("server-toggle");
-  if (!el) return null;
+  if (!el) {return null;}
   const r = el.getBoundingClientRect();
   if (r.width > 0 && r.height > 0)
-    return [r.left + r.width / 2, r.top + r.height / 2];
+    {return [r.left + r.width / 2, r.top + r.height / 2];}
   return null;
 });
 
 // Whether the selected server's toggle is enabled (aria-checked="true").
 const serverIsEnabled = extract((state) => {
   const el = state.document.getElementById("server-toggle");
-  if (!el) return null;
+  if (!el) {return null;}
   return el.getAttribute("aria-checked") === "true";
 });
 
@@ -89,7 +89,7 @@ const activeSessionCount = extract((state) => {
   const el = state.document.querySelector<HTMLElement>(
     "[data-testid='server-health']",
   );
-  if (!el) return null;
+  if (!el) {return null;}
   const v = el.dataset.active;
   return v != null ? parseInt(v, 10) : null;
 });
@@ -97,10 +97,10 @@ const activeSessionCount = extract((state) => {
 // Centre-point of the Force button (visible only when a server is draining).
 const forceButtonPoint = extract((state) => {
   const el = state.document.getElementById("force-btn");
-  if (!el) return null;
+  if (!el) {return null;}
   const r = el.getBoundingClientRect();
   if (r.width > 0 && r.height > 0)
-    return [r.left + r.width / 2, r.top + r.height / 2];
+    {return [r.left + r.width / 2, r.top + r.height / 2];}
   return null;
 });
 
@@ -111,7 +111,7 @@ const selectedServerText = extract((state) => {
   const trigger = state.document.querySelector<HTMLElement>(
     "[data-testid='server-select-trigger']",
   );
-  if (!trigger) return null;
+  if (!trigger) {return null;}
   return trigger.textContent?.trim() || null;
 });
 
@@ -120,10 +120,10 @@ const serverSelectTriggerPoint = extract((state) => {
   const el = state.document.querySelector<HTMLElement>(
     "[data-testid='server-select-trigger']",
   );
-  if (!el) return null;
+  if (!el) {return null;}
   const r = el.getBoundingClientRect();
   if (r.width > 0 && r.height > 0)
-    return [r.left + r.width / 2, r.top + r.height / 2];
+    {return [r.left + r.width / 2, r.top + r.height / 2];}
   return null;
 });
 
@@ -136,7 +136,7 @@ const serverSelectItemPoints = extract((state) => {
   for (const item of Array.from(items)) {
     const r = item.getBoundingClientRect();
     if (r.width > 0 && r.height > 0)
-      pts.push([r.left + r.width / 2, r.top + r.height / 2]);
+      {pts.push([r.left + r.width / 2, r.top + r.height / 2]);}
   }
   return pts;
 });
@@ -150,7 +150,7 @@ const matchmakerNavPoint = extract((state) => {
     if (a.textContent?.includes("Matchmaker")) {
       const r = a.getBoundingClientRect();
       if (r.width > 0 && r.height > 0)
-        return [r.left + r.width / 2, r.top + r.height / 2];
+        {return [r.left + r.width / 2, r.top + r.height / 2];}
     }
   }
   return null;
@@ -163,7 +163,7 @@ const gameServerNavPoint = extract((state) => {
     if (a.textContent?.includes("Game Servers")) {
       const r = a.getBoundingClientRect();
       if (r.width > 0 && r.height > 0)
-        return [r.left + r.width / 2, r.top + r.height / 2];
+        {return [r.left + r.width / 2, r.top + r.height / 2];}
     }
   }
   return null;
@@ -191,10 +191,10 @@ const canGoBack = extract((state) => {
 // The UI lingers for 2 s; 10 s gives plenty of headroom.
 export const winnerShownThenDisappears = always(() => {
   const winners = finishedWinnerCards.current;
-  if (winners.length === 0) return true;
+  if (winners.length === 0) {return true;}
   const card = winners[0];
   const id = card.id;
-  if (!id) return true;
+  if (!id) {return true;}
   // The extractor already confirmed the winner text is visible; assert cleanup.
   return eventually(() => !gameCardIds.current.includes(id)).within(
     5,
@@ -209,7 +209,7 @@ export const winnerShownThenDisappears = always(() => {
 // away from the initially selected server.
 export const exploresMultipleServers = eventually(() => {
   const server = selectedServerText.current;
-  if (!server) return false;
+  if (!server) {return false;}
   return eventually(() => {
     const other = selectedServerText.current;
     return !!other && other !== server;
@@ -223,7 +223,7 @@ export const exploresMultipleServers = eventually(() => {
 // Re-disabling is an acceptable exit (bombadil may toggle it off).
 export const serverRecoversAfterEnable = always(() => {
   if (serverIsEnabled.current !== true || activeSessionCount.current !== 0)
-    return true;
+    {return true;}
   return eventually(
     () => (activeSessionCount.current ?? 0) > 0 || !serverIsEnabled.current,
   ).within(30, "seconds");
@@ -261,7 +261,7 @@ export const explore = actions(() => {
   // Toggle server enabled/disabled.
   const togglePt = serverTogglePoint.current;
   if (togglePt)
-    weightedActions.push([
+    {weightedActions.push([
       2,
       {
         Click: {
@@ -269,12 +269,12 @@ export const explore = actions(() => {
           point: { x: togglePt[0], y: togglePt[1] },
         },
       },
-    ]);
+    ]);}
 
   // Force-cancel all sessions on a draining server.
   const forcePt = forceButtonPoint.current;
   if (forcePt)
-    weightedActions.push([
+    {weightedActions.push([
       3,
       {
         Click: {
@@ -282,15 +282,15 @@ export const explore = actions(() => {
           point: { x: forcePt[0], y: forcePt[1] },
         },
       },
-    ]);
+    ]);}
 
   // Go back if there is history.
-  if (canGoBack.current) weightedActions.push([1, "Back"]);
+  if (canGoBack.current) {weightedActions.push([1, "Back"]);}
 
   // Open the server select dropdown.
   const selectPt = serverSelectTriggerPoint.current;
   if (selectPt)
-    weightedActions.push([
+    {weightedActions.push([
       2,
       {
         Click: {
@@ -298,7 +298,7 @@ export const explore = actions(() => {
           point: { x: selectPt[0], y: selectPt[1] },
         },
       },
-    ]);
+    ]);}
 
   // Pick a server from the open dropdown.
   const selectItems = serverSelectItemPoints.current;
@@ -312,17 +312,17 @@ export const explore = actions(() => {
   // Navigate between pages via the nav links.
   const mmPt = matchmakerNavPoint.current;
   if (mmPt)
-    weightedActions.push([
+    {weightedActions.push([
       2,
       { Click: { name: "matchmaker-nav", point: { x: mmPt[0], y: mmPt[1] } } },
-    ]);
+    ]);}
 
   const gsPt = gameServerNavPoint.current;
   if (gsPt)
-    weightedActions.push([
+    {weightedActions.push([
       2,
       { Click: { name: "gameserver-nav", point: { x: gsPt[0], y: gsPt[1] } } },
-    ]);
+    ]);}
 
   return weighted(weightedActions).generate();
 });

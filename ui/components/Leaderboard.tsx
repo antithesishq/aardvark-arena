@@ -8,8 +8,8 @@ function playerStatus(
   queuedIds?: Set<string>,
   playingIds?: Set<string>,
 ): { label: string; color: string } {
-  if (playingIds?.has(id)) return { label: "playing", color: "text-green-400" };
-  if (queuedIds?.has(id)) return { label: "queued", color: "text-violet-400" };
+  if (playingIds?.has(id)) {return { label: "playing", color: "text-green-400" };}
+  if (queuedIds?.has(id)) {return { label: "queued", color: "text-violet-400" };}
   return { label: "offline", color: "text-zinc-600" };
 }
 

@@ -16,19 +16,18 @@ const STATUS_ACTIVE = 0;
 const STATUS_P1_WIN = 1;
 const STATUS_P2_WIN = 2;
 const STATUS_DRAW = 3;
-const STATUS_CANCELLED = 4;
 
 function turnCount(state: GameState | null, game: string): number {
-  if (!state) return 0;
+  if (!state) {return 0;}
   const shared = state.Shared as Record<string, unknown>;
   if (game === "tictactoe" || game === "connect4") {
     const cells = shared?.Cells as (number | null)[][] | undefined;
-    if (!cells) return 0;
+    if (!cells) {return 0;}
     return cells.flat().filter((c) => c !== null).length;
   }
   if (game === "battleship") {
     const attacks = shared?.Attacks as { P1?: Record<string, number>; P2?: Record<string, number> } | undefined;
-    if (!attacks) return 0;
+    if (!attacks) {return 0;}
     return Object.keys(attacks.P1 ?? {}).length + Object.keys(attacks.P2 ?? {}).length;
   }
   return 0;
@@ -53,7 +52,7 @@ export function GameCard({ session, serverUrl, elapsedSeconds }: Props) {
     setCancelError(null);
     try {
       const res = await cancelSession(serverUrl, session.session_id);
-      if (!res.ok) setCancelError(`Error ${res.status}`);
+      if (!res.ok) {setCancelError(`Error ${res.status}`);}
     } catch {
       setCancelError("Network error");
     } finally {

@@ -11,7 +11,7 @@ import { PlayerQueueRing } from "@/components/PlayerQueueRing";
 import { Leaderboard } from "@/components/Leaderboard";
 
 function fmtAvgWait(sessions: StatusResponse["sessions"]): string {
-  if (sessions.length === 0) return "—";
+  if (sessions.length === 0) {return "—";}
   const now = Date.now();
   const avg =
     sessions.reduce(
@@ -42,9 +42,9 @@ export default function MatchmakerPage() {
   }, []);
 
   useEffect(() => {
-    refresh();
+    const t = setTimeout(refresh, 0);
     const id = setInterval(refresh, 3000);
-    return () => clearInterval(id);
+    return () => { clearTimeout(t); clearInterval(id); };
   }, [refresh]);
 
   const sessions = (status?.sessions ?? [])
