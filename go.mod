@@ -10,6 +10,7 @@ require (
 	github.com/antithesishq/antithesis-sdk-go v0.7.0
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/mattn/go-sqlite3 v1.14.33
+	hegel.dev/go/hegel v0.1.2
 )
 
 require (
@@ -18,7 +19,6 @@ require (
 	golang.org/x/mod v0.33.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/tools v0.42.0 // indirect
-	hegel.dev/go/hegel v0.1.2 // indirect
 )
 
 tool github.com/antithesishq/antithesis-sdk-go/tools/antithesis-go-instrumentor

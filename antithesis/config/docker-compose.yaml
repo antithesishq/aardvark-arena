@@ -1,5 +1,7 @@
 name: aardvark-arena
 
+x-auth-token: &auth-token "d4f5a1b2-0e3c-4a6d-9f8b-7c2e1d3a5b6f"
+
 services:
   matchmaker:
     container_name: aardvark-arena-matchmaker
@@ -18,6 +20,13 @@ services:
       - "-match-interval=100ms"
       - "-session-timeout=2m"
       - "-monitor-interval=1s"
+      - "-token"
+      - *auth-token
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
 
   gameserver:
     container_name: aardvark-arena-gameserver
@@ -36,6 +45,34 @@ services:
       - "-matchmaker=http://aardvark-arena-matchmaker:8080"
       - "-turn-timeout=10s"
       - "-max-sessions=6"
+      - "-token"
+      - *auth-token
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8081/health"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
+  gameserver-2:
+    container_name: aardvark-arena-gameserver-2
+    hostname: aardvark-arena-gameserver-2
+    platform: linux/amd64
+    image: aardvark-arena-gameserver:latest
+    environment:
+      NO_COLOR: "1"
+    command:
+      - "-addr=:8081"
+      - "-self-url=http://aardvark-arena-gameserver-2:8081"
+      - "-matchmaker=http://aardvark-arena-matchmaker:8080"
+      - "-turn-timeout=10s"
+      - "-max-sessions=6"
+      - "-token"
+      - *auth-token
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8081/health"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
 
   workload-1:
     container_name: aardvark-arena-workload-1
@@ -48,6 +85,13 @@ services:
     image: aardvark-arena-workload:latest
     environment:
       NO_COLOR: "1"
+    depends_on:
+      matchmaker:
+        condition: service_healthy
+      gameserver:
+        condition: service_healthy
+      gameserver-2:
+        condition: service_healthy
 
   workload-2:
     container_name: aardvark-arena-workload-2
@@ -56,3 +100,10 @@ services:
     image: aardvark-arena-workload:latest
     environment:
       NO_COLOR: "1"
+    depends_on:
+      matchmaker:
+        condition: service_healthy
+      gameserver:
+        condition: service_healthy
+      gameserver-2:
+        condition: service_healthy

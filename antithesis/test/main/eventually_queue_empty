@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Queue two fresh players for a quick game to validate end-to-end flow
+# still works after testing.
+
+player \
+    -matchmaker=http://aardvark-arena-matchmaker:8080 \
+    -num-sessions=1 \
+    -poll-interval=500ms &
+pid1=$!
+
+player \
+    -matchmaker=http://aardvark-arena-matchmaker:8080 \
+    -num-sessions=1 \
+    -poll-interval=500ms &
+pid2=$!
+
+wait "$pid1" "$pid2"
+echo "End-to-end queue validation complete"

@@ -18,5 +18,5 @@ elif [[ -n "${ANTITHESIS_SDK_LOCAL_OUTPUT:-}" ]]; then
   echo "Antithesis SDK local output override detected, emitting setup_complete to ${OUTPUT_PATH}"
 fi
 
-mkdir -p $(dirname "$OUTPUT_PATH")
+mkdir -p "$(dirname "$OUTPUT_PATH")"
 echo '{"antithesis_setup":{"status":"complete","details":{"message":"ready to go"}}}' >> "${OUTPUT_PATH}"

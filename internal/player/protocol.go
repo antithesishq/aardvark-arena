@@ -9,8 +9,8 @@ import (
 
 	"github.com/antithesishq/aardvark-arena/internal"
 	"github.com/antithesishq/aardvark-arena/internal/game"
-	"github.com/antithesishq/antithesis-sdk-go/assert"
 	"github.com/antithesishq/aardvark-arena/internal/gameserver"
+	"github.com/antithesishq/antithesis-sdk-go/assert"
 )
 
 // Completion holds the result of a finished protocol run.

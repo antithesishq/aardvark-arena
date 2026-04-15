@@ -310,9 +310,7 @@ func (s *Server) startRegistrationLoop(ctx context.Context) {
 		registered := false
 		for {
 			if s.register() {
-				if !registered {
-					registered = true
-				}
+				registered = true
 				backoff = heartbeat
 			} else if registered {
 				// Lost contact after a successful registration — reset backoff.

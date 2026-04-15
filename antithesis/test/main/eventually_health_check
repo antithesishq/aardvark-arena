@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Check that all services are healthy by hitting their /health endpoints.
+
+failed=0
+
+for url in \
+    "http://aardvark-arena-matchmaker:8080/health" \
+    "http://aardvark-arena-gameserver:8081/health" \
+    "http://aardvark-arena-gameserver-2:8081/health"; do
+    if ! curl -sf "$url" > /dev/null 2>&1; then
+        echo "FAIL: $url is not healthy"
+        failed=1
+    fi
+done
+
+if [ "$failed" -ne 0 ]; then
+    exit 1
+fi
+
+echo "All services healthy"

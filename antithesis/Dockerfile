@@ -51,7 +51,7 @@ RUN go build -race -o /player ./cmd/player
 # ---- Stage: matchmaker (runtime) ----
 FROM debian:bookworm-slim AS matchmaker
 
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && \
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl && \
     rm -rf /var/lib/apt/lists/*
 
 ENV NO_COLOR=1
@@ -66,7 +66,7 @@ CMD ["-addr=:8080", "-db-path=/data/matchmaker.db", "-match-interval=100ms", "-s
 # ---- Stage: gameserver (runtime) ----
 FROM debian:bookworm-slim AS gameserver
 
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && \
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl && \
     rm -rf /var/lib/apt/lists/*
 
 ENV NO_COLOR=1
@@ -81,7 +81,7 @@ CMD ["-addr=:8081", "-self-url=http://gameserver:8081", "-matchmaker=http://matc
 # ---- Stage: workload (runtime) ----
 FROM debian:bookworm-slim AS workload
 
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates bash coreutils && \
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates bash coreutils curl && \
     rm -rf /var/lib/apt/lists/*
 
 ENV NO_COLOR=1

@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+NUM_SESSIONS=$(( (RANDOM % 20) + 1 ))
+
+exec player \
+    -matchmaker=http://aardvark-arena-matchmaker:8080 \
+    -num-sessions="$NUM_SESSIONS" \
+    -poll-interval=500ms \
+    -evil \
+    -evil-chaos-rate=0.35 \
+    -evil-out-of-turn-rate=0.20 \
+    -evil-malformed-rate=0.55 \
+    -evil-extra-connect-rate=0.18 \
+    -evil-queue-abandon-rate=0.16

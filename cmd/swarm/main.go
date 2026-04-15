@@ -50,11 +50,11 @@ func main() {
 	for i := 0; i < *numPlayers; i++ {
 		wg.Add(1)
 		cfg := player.Config{
-			MatchmakerURL:            &matchmakerURL,
-			PlayerID:                 uuid.New(),
-			NumSessions:              *numSessions,
-			PollInterval:             *pollInterval,
-			GameLength:               *gameLength,
+			MatchmakerURL:             &matchmakerURL,
+			PlayerID:                  uuid.New(),
+			NumSessions:               *numSessions,
+			PollInterval:              *pollInterval,
+			GameLength:                *gameLength,
 			SpecificGameSelectionRate: player.DefaultSpecificGameSelectionRate,
 			Behavior: player.Behavior{
 				Evil:             *evil,
