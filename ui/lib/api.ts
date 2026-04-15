@@ -43,7 +43,9 @@ export interface HealthResponse {
 
 async function get<T>(url: string): Promise<T> {
   const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) {throw new Error(`${url} → ${res.status}`);}
+  if (!res.ok) {
+    throw new Error(`${url} → ${res.status}`);
+  }
   return res.json();
 }
 
@@ -53,7 +55,8 @@ export interface ServerInfo {
 }
 
 export const fetchStatus = () => get<StatusResponse>(`${MM}/status`);
-export const fetchLeaderboard = () => get<LeaderboardEntry[]>(`${MM}/leaderboard`);
+export const fetchLeaderboard = () =>
+  get<LeaderboardEntry[]>(`${MM}/leaderboard`);
 export const fetchServers = () => get<ServerInfo[]>(`${MM}/servers`);
 export const fetchSessions = (serverUrl: string) =>
   get<SessionSummary[]>(`${serverUrl}/sessions`);

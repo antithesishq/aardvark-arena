@@ -11,7 +11,9 @@ import { PlayerQueueRing } from "@/components/PlayerQueueRing";
 import { Leaderboard } from "@/components/Leaderboard";
 
 function fmtAvgWait(sessions: StatusResponse["sessions"]): string {
-  if (sessions.length === 0) {return "—";}
+  if (sessions.length === 0) {
+    return "—";
+  }
   const now = Date.now();
   const avg =
     sessions.reduce(
@@ -44,7 +46,10 @@ export default function MatchmakerPage() {
   useEffect(() => {
     const t = setTimeout(refresh, 0);
     const id = setInterval(refresh, 3000);
-    return () => { clearTimeout(t); clearInterval(id); };
+    return () => {
+      clearTimeout(t);
+      clearInterval(id);
+    };
   }, [refresh]);
 
   const sessions = (status?.sessions ?? [])
@@ -54,8 +59,14 @@ export default function MatchmakerPage() {
     .slice()
     .sort((a, b) => a.player_id.localeCompare(b.player_id));
   const board = leaderboard ?? [];
-  const queuedIds = useMemo(() => new Set(queue.map((p) => p.player_id)), [queue]);
-  const playingIds = useMemo(() => new Set(sessions.flatMap((s) => s.player_ids)), [sessions]);
+  const queuedIds = useMemo(
+    () => new Set(queue.map((p) => p.player_id)),
+    [queue],
+  );
+  const playingIds = useMemo(
+    () => new Set(sessions.flatMap((s) => s.player_ids)),
+    [sessions],
+  );
 
   return (
     <div className="max-w-7xl mx-auto px-6 space-y-4">

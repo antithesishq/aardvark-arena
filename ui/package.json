@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "format": "biome format --write",
+    "format:check": "biome format",
     "bombadil": "CHROME=chrome/chrome-wrapper.sh bombadil test --headless --time-limit 1m --exit-on-violation http://localhost:8000 --output-path bombadil-report bombadil.spec.ts",
     "bombadil:headed": "CHROME=chrome/chrome-wrapper.sh bombadil test --time-limit 1m --exit-on-violation http://localhost:8000 --output-path bombadil-report bombadil.spec.ts"
   },
@@ -26,6 +28,7 @@
   },
   "devDependencies": {
     "@antithesishq/bombadil": "^0.4.2",
+    "@biomejs/biome": "2.4.12",
     "@puppeteer/browsers": "^2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",

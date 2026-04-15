@@ -1,8 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { fetchServers, drainServer, activateServer, cancelAllSessions, type ServerInfo } from "@/lib/api";
-import { GameServerSection, ServerHealth } from "@/components/GameServerSection";
+import {
+  fetchServers,
+  drainServer,
+  activateServer,
+  cancelAllSessions,
+  type ServerInfo,
+} from "@/lib/api";
+import {
+  GameServerSection,
+  ServerHealth,
+} from "@/components/GameServerSection";
 import { StatusBadge } from "@/components/badges";
 import { Button } from "@/components/ui/button";
 import { cn, mono } from "@/lib/utils";
@@ -18,7 +27,13 @@ function serverLabel(server: ServerInfo): string {
   return server.url;
 }
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+function Toggle({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
   return (
     <button
       type="button"
@@ -51,27 +66,32 @@ export default function GameServerPage() {
     fetchServers()
       .then((s) => {
         setServers(s);
-        if (s.length > 0) {setSelected(s[0].url);}
+        if (s.length > 0) {
+          setSelected(s[0].url);
+        }
       })
       .catch((e) => setError(String(e)));
   }, []);
 
-  const handleHealthChange = useCallback((url: string, health: ServerHealth) => {
-    setHealthMap((prev) => {
-      const existing = prev[url];
-      if (
-        existing &&
-        existing.connected === health.connected &&
-        existing.active === health.active &&
-        existing.max === health.max &&
-        existing.degraded === health.degraded &&
-        existing.enabled === health.enabled
-      ) {
-        return prev;
-      }
-      return { ...prev, [url]: health };
-    });
-  }, []);
+  const handleHealthChange = useCallback(
+    (url: string, health: ServerHealth) => {
+      setHealthMap((prev) => {
+        const existing = prev[url];
+        if (
+          existing &&
+          existing.connected === health.connected &&
+          existing.active === health.active &&
+          existing.max === health.max &&
+          existing.degraded === health.degraded &&
+          existing.enabled === health.enabled
+        ) {
+          return prev;
+        }
+        return { ...prev, [url]: health };
+      });
+    },
+    [],
+  );
 
   const h = selected ? healthMap[selected] : undefined;
   const draining = h ? h.connected && !h.enabled && h.active > 0 : false;
@@ -93,7 +113,12 @@ export default function GameServerPage() {
             </SelectTrigger>
             <SelectContent>
               {servers.map((s) => (
-                <SelectItem key={s.url} value={s.url} data-testid="server-select-item" style={mono}>
+                <SelectItem
+                  key={s.url}
+                  value={s.url}
+                  data-testid="server-select-item"
+                  style={mono}
+                >
                   {serverLabel(s)}
                 </SelectItem>
               ))}
@@ -102,9 +127,20 @@ export default function GameServerPage() {
 
           {/* Health badge — always shows status */}
           {(() => {
-            if (!h) {return null;}
-            if (!h.connected) {return <StatusBadge status="disconnected" label="OFFLINE" />;}
-            return <span data-testid="server-health" data-active={h.active}><StatusBadge status={h.degraded ? "full" : "connected"} label={`${h.active}/${h.max}`} /></span>;
+            if (!h) {
+              return null;
+            }
+            if (!h.connected) {
+              return <StatusBadge status="disconnected" label="OFFLINE" />;
+            }
+            return (
+              <span data-testid="server-health" data-active={h.active}>
+                <StatusBadge
+                  status={h.degraded ? "full" : "connected"}
+                  label={`${h.active}/${h.max}`}
+                />
+              </span>
+            );
           })()}
 
           {/* Enabled toggle */}
@@ -112,7 +148,9 @@ export default function GameServerPage() {
             <Toggle
               checked={h.enabled}
               onChange={(checked) => {
-                if (!selected) {return;}
+                if (!selected) {
+                  return;
+                }
                 if (checked) {
                   activateServer(selected);
                 } else {
@@ -123,19 +161,24 @@ export default function GameServerPage() {
           )}
 
           {/* Server state badge */}
-          {h?.connected && (
-            draining
-              ? <StatusBadge status="draining" label="DRAINING" />
-              : h.enabled
-                ? <StatusBadge status="connected" label="ENABLED" />
-                : <StatusBadge status="disconnected" label="DISABLED" />
-          )}
+          {h?.connected &&
+            (draining ? (
+              <StatusBadge status="draining" label="DRAINING" />
+            ) : h.enabled ? (
+              <StatusBadge status="connected" label="ENABLED" />
+            ) : (
+              <StatusBadge status="disconnected" label="DISABLED" />
+            ))}
 
           {/* Force cancel — only when draining */}
           {draining && (
-            <Button size="sm" variant="destructive" style={mono}
+            <Button
+              size="sm"
+              variant="destructive"
+              style={mono}
               id="force-btn"
-              onClick={() => selected && cancelAllSessions(selected)}>
+              onClick={() => selected && cancelAllSessions(selected)}
+            >
               Force
             </Button>
           )}
@@ -144,18 +187,31 @@ export default function GameServerPage() {
 
           {(() => {
             const healths = Object.values(healthMap);
-            const totalActive = healths.reduce((s, h) => s + (h.connected ? h.active : 0), 0);
-            const totalMax = healths.reduce((s, h) => s + (h.connected ? h.max : 0), 0);
-            if (healths.length === 0) {return null;}
+            const totalActive = healths.reduce(
+              (s, h) => s + (h.connected ? h.active : 0),
+              0,
+            );
+            const totalMax = healths.reduce(
+              (s, h) => s + (h.connected ? h.max : 0),
+              0,
+            );
+            if (healths.length === 0) {
+              return null;
+            }
             return (
-              <span className="text-xs text-zinc-400 flex items-center gap-3" style={mono}>
+              <span
+                className="text-xs text-zinc-400 flex items-center gap-3"
+                style={mono}
+              >
                 <span>
                   <span className="text-zinc-500">SERVERS</span>{" "}
                   <span className="tabular-nums">{servers.length}</span>
                 </span>
                 <span>
                   <span className="text-zinc-500">SESSIONS</span>{" "}
-                  <span className="tabular-nums">{totalActive}/{totalMax}</span>
+                  <span className="tabular-nums">
+                    {totalActive}/{totalMax}
+                  </span>
                 </span>
               </span>
             );

@@ -128,7 +128,8 @@
     @apply font-sans;
     overscroll-behavior: none;
   }
-  a, button {
+  a,
+  button {
     cursor: pointer !important;
   }
 }
