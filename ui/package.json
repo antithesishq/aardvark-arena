@@ -9,8 +9,8 @@
     "lint": "eslint",
     "format": "biome format --write",
     "format:check": "biome format",
-    "bombadil": "RUST_LOG=chromiumoxide.handler=error CHROME=chrome/chrome-wrapper.sh bombadil test --headless --time-limit 1m --exit-on-violation http://localhost:8000 --output-path bombadil-report bombadil.spec.ts",
-    "bombadil:headed": "RUST_LOG=chromiumoxide.handler=error CHROME=chrome/chrome-wrapper.sh bombadil test --time-limit 1m --exit-on-violation http://localhost:8000 --output-path bombadil-report bombadil.spec.ts"
+    "bombadil": "rm -rf bombadil-report && RUST_LOG=chromiumoxide.handler=error CHROME=chrome/chrome-wrapper.sh bombadil test --headless --time-limit 1m --exit-on-violation http://localhost:8000 --output-path bombadil-report bombadil.spec.ts",
+    "bombadil:headed": "rm -rf bombadil-report && RUST_LOG=chromiumoxide.handler=error CHROME=chrome/chrome-wrapper.sh bombadil test --time-limit 1m --exit-on-violation http://localhost:8000 --output-path bombadil-report bombadil.spec.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",
