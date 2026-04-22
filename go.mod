@@ -10,7 +10,7 @@ require (
 	github.com/antithesishq/antithesis-sdk-go v0.7.0
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/mattn/go-sqlite3 v1.14.42
-	hegel.dev/go/hegel v0.1.2
+	hegel.dev/go/hegel v0.1.3
 )
 
 require (
