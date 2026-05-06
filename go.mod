@@ -9,7 +9,7 @@ require github.com/coder/websocket v1.8.14
 require (
 	github.com/antithesishq/antithesis-sdk-go v0.7.0
 	github.com/jmoiron/sqlx v1.4.0
-	github.com/mattn/go-sqlite3 v1.14.42
+	github.com/mattn/go-sqlite3 v1.14.44
 	hegel.dev/go/hegel v0.1.2
 )
 
