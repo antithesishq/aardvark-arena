@@ -89,6 +89,17 @@ const selectSessionPlayers = `
 	WHERE s.session_id = ?
 `
 
+const updatePlayerSessionAborted = `
+	UPDATE player_session
+	SET aborted = 1
+	WHERE player_id = ? AND session_id = ?
+`
+
+const selectSessionAbortedCount = `
+	SELECT COUNT(*) FROM player_session
+	WHERE session_id = ? AND aborted = 1
+`
+
 // DB wraps an SQLite database for matchmaker persistence.
 type DB struct {
 	db *sqlx.DB
@@ -151,6 +162,7 @@ func ensureSchema(conn sqlx.Execer) error {
 		CREATE TABLE IF NOT EXISTS player_session (
 			player_id BLOB NOT NULL,
 			session_id BLOB NOT NULL,
+			aborted INTEGER NOT NULL DEFAULT 0,
 
 			PRIMARY KEY (player_id, session_id),
 			FOREIGN KEY(player_id) REFERENCES players(player_id),
@@ -262,6 +274,39 @@ func (db *DB) CreateSession(
 		return nil, err
 	}
 	return &s, nil
+}
+
+// AbortPlayerInSession marks the player's row as aborted for the given session.
+// If both players in the session are aborted, it also marks the session as cancelled.
+func (db *DB) AbortPlayerInSession(sid internal.SessionID, pid internal.PlayerID) error {
+	tx, err := db.db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	_, err = tx.Exec(updatePlayerSessionAborted, pid, sid)
+	if err != nil {
+		return err
+	}
+
+	var abortedCount int
+	err = tx.Get(&abortedCount, selectSessionAbortedCount, sid)
+	if err != nil {
+		return err
+	}
+
+	if abortedCount >= 2 {
+		assert.Reachable(
+			"sessions are sometimes aborted after both players unqueue",
+			map[string]any{"sid": sid.String()},
+		)
+		_, err = tx.Exec(updateSessionResult, true, uuid.Nil, time.Now(), sid)
+		if err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 // ReportSessionResult records the outcome of a finished session.

@@ -72,7 +72,9 @@ func (q *MatchQueue) matchPlayers() {
 	for _, match := range matches {
 		session, err := q.fleet.CreateSession(match.game)
 		if err == ErrNoServersAvailable {
-			continue
+			// fleet has no capacity; further matches in this cycle will fail too
+			log.Print("matchmaker: no game servers available, will retry")
+			break
 		} else if err != nil {
 			log.Panicf("fleet error: %v", err)
 		}
@@ -217,11 +219,20 @@ func (q *MatchQueue) Queue(player *PlayerModel, game *game.Kind) (*SessionInfo, 
 	return nil, nil
 }
 
-// Unqueue idempotently removes a player from the queue.
-func (q *MatchQueue) Unqueue(pid internal.PlayerID) {
+// Unqueue idempotently removes a player from the queue. If the player is in an
+// active match, their participation is marked aborted; once both players in a
+// session have aborted, the session is cancelled in the database.
+func (q *MatchQueue) Unqueue(pid internal.PlayerID) error {
 	q.mu.Lock()
-	defer q.mu.Unlock()
 	delete(q.queued, pid)
+	session, hasSession := q.matched[pid]
+	delete(q.matched, pid)
+	q.mu.Unlock()
+
+	if !hasSession {
+		return nil
+	}
+	return q.db.AbortPlayerInSession(session.SessionID, pid)
 }
 
 // Untrack removes a session and associated players, allowing them to requeue

@@ -121,7 +121,10 @@ func (s *Server) handleUnqueue(w http.ResponseWriter, r *http.Request) {
 		internal.WriteError(w, http.StatusBadRequest, err)
 		return
 	}
-	s.queue.Unqueue(pid)
+	if err := s.queue.Unqueue(pid); err != nil {
+		internal.WriteError(w, http.StatusInternalServerError, err)
+		return
+	}
 	_, _ = w.Write([]byte("ok"))
 }
 
