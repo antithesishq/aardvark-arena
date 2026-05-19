@@ -59,3 +59,23 @@ func (c *MatchmakerClient) Queue(ctx context.Context, pref *game.Kind) (*matchma
 	}
 	return &info, nil
 }
+
+// Unqueue asks the matchmaker to remove the player from the queue.
+func (c *MatchmakerClient) Unqueue(ctx context.Context) error {
+	reqURL := c.url.JoinPath("queue", c.pid.String())
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, reqURL.String(), nil)
+	if err != nil {
+		return err
+	}
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("unexpected status: %d", resp.StatusCode)
+	}
+	return nil
+}

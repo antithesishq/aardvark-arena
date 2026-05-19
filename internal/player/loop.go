@@ -3,6 +3,7 @@ package player
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"math/rand"
@@ -18,6 +19,9 @@ import (
 
 // DefaultSpecificGameSelectionRate determines the probability a player will select a specific game to queue for.
 const DefaultSpecificGameSelectionRate = 0.20
+
+// unqueueShutdownTimeout bounds the unqueue request issued when the player loop exits.
+const unqueueShutdownTimeout = 2 * time.Second
 
 // Config holds player configuration.
 type Config struct {
@@ -58,6 +62,8 @@ func New(cfg Config) *Loop {
 
 // Run repeatedly queues for matches and plays games until ctx is cancelled.
 func (l *Loop) Run(ctx context.Context) error {
+	defer l.unqueueOnShutdown()
+
 	var lastSID internal.SessionID
 	sessions := 0
 
@@ -72,6 +78,11 @@ func (l *Loop) Run(ctx context.Context) error {
 		lastSID = session.SessionID
 
 		if err := l.playGame(ctx, session); err != nil {
+			if errors.Is(err, ErrGameServerUnavailable) {
+				log.Printf("player %s: game server unavailable; unqueueing before retry", l.cfg.PlayerID)
+				l.unqueueNow()
+				continue
+			}
 			log.Printf("player %s: game error: %v", l.cfg.PlayerID, err)
 		}
 
@@ -81,6 +92,23 @@ func (l *Loop) Run(ctx context.Context) error {
 		}
 	}
 	return ctx.Err()
+}
+
+// unqueueOnShutdown is invoked as a deferred cleanup when Run returns; it asks
+// the matchmaker to drop this player so a stale entry doesn't linger.
+func (l *Loop) unqueueOnShutdown() {
+	l.unqueueNow()
+}
+
+// unqueueNow performs a best-effort unqueue with its own short-lived context so
+// it works even when the loop's context has already been cancelled.
+func (l *Loop) unqueueNow() {
+	ctx, cancel := context.WithTimeout(context.Background(), unqueueShutdownTimeout)
+	defer cancel()
+
+	if err := l.client.Unqueue(ctx); err != nil {
+		log.Printf("player %s: unqueue failed: %v", l.cfg.PlayerID, err)
+	}
 }
 
 // waitForMatch polls the matchmaker queue until a new session is assigned.
@@ -129,7 +157,10 @@ func (l *Loop) playGame(ctx context.Context, info *matchmaker.SessionInfo) error
 	defer cancel()
 
 	session := NewSession(info.Server, info.SessionID, l.cfg.PlayerID, l.cfg.Behavior)
-	go session.Run(ctx)
+	sessionErr := make(chan error, 1)
+	go func() {
+		sessionErr <- session.Run(ctx)
+	}()
 
 	var moveDelay time.Duration
 	if l.cfg.GameLength > 0 {
@@ -157,6 +188,9 @@ func (l *Loop) playGame(ctx context.Context, info *matchmaker.SessionInfo) error
 	}
 
 	if err != nil {
+		return err
+	}
+	if err := <-sessionErr; err != nil && !errors.Is(err, context.Canceled) {
 		return err
 	}
 	log.Printf("player %s: game finished: status=%s interrupted=%v", l.cfg.PlayerID, completion.Status, completion.Interrupted)

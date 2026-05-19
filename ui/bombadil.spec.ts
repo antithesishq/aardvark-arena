@@ -297,7 +297,7 @@ export const explore = actions(() => {
   }
 
   const weightedActions: [number, Action | ActionGenerator][] = [
-    [2, "Wait"], 
+    [2, "Wait"],
     [2, scroll],
     [1, navigation],
   ];

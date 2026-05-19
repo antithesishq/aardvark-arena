@@ -19,6 +19,11 @@ import (
 )
 
 const reconnectInterval = time.Second
+const dialTimeout = 30 * time.Second
+
+// ErrGameServerUnavailable is returned by Run when the game server cannot be
+// reached within dialTimeout.
+var ErrGameServerUnavailable = errors.New("game server unavailable")
 
 // Session manages a websocket connection to the game server,
 // transparently handling reconnection on failure.
@@ -52,8 +57,10 @@ func NewSession(
 	}
 }
 
-// Run manages the websocket connection lifecycle.
-func (s *Session) Run(ctx context.Context) {
+// Run manages the websocket connection lifecycle. It returns
+// ErrGameServerUnavailable when the server cannot be reached within
+// dialTimeout, nil on a clean session close, or the underlying error otherwise.
+func (s *Session) Run(ctx context.Context) error {
 	defer close(s.protocolRx)
 	if s.behavior.Evil {
 		go s.runExtraConnectChaos(ctx)
@@ -63,11 +70,11 @@ func (s *Session) Run(ctx context.Context) {
 		conn, err := s.dial(ctx)
 		if err != nil {
 			log.Printf("player %s: dial error: %v", s.pid, err)
-			return
+			return err
 		}
 
 		err = s.bridge(ctx, conn)
-		if status := websocket.CloseStatus(err); status >= 0 || errors.Is(err, io.EOF) {
+		if status := websocket.CloseStatus(err); status >= 0 || errors.Is(err, io.EOF) || errors.Is(err, context.Canceled) {
 			// websocket closed by server, finished
 			log.Printf("player %s: connection closed", s.pid)
 			break
@@ -76,6 +83,7 @@ func (s *Session) Run(ctx context.Context) {
 			log.Printf("player %s: connection error: %v", s.pid, err)
 		}
 	}
+	return nil
 }
 
 func (s *Session) runExtraConnectChaos(ctx context.Context) {
@@ -109,9 +117,19 @@ func (s *Session) runExtraConnectChaos(ctx context.Context) {
 	}
 }
 
-// dial the server, retrying on temporary failure.
+// dial the server, retrying on temporary failure up to dialTimeout. If the
+// timeout elapses with no successful connection, returns ErrGameServerUnavailable.
 func (s *Session) dial(ctx context.Context) (*websocket.Conn, error) {
+	timer := time.NewTimer(dialTimeout)
+	defer timer.Stop()
+
 	for {
+		select {
+		case <-timer.C:
+			return nil, ErrGameServerUnavailable
+		default:
+		}
+
 		u := s.serverURL.JoinPath("session", s.sid.String(), s.pid.String())
 		conn, _, err := websocket.Dial(ctx, u.String(), &websocket.DialOptions{HTTPClient: s.client})
 		if internal.HTTPIsTemporary(err) {
