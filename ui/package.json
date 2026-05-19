@@ -29,7 +29,7 @@
   "devDependencies": {
     "@antithesishq/bombadil": "^0.4.5",
     "@biomejs/biome": "2.4.12",
-    "@puppeteer/browsers": "^2",
+    "@puppeteer/browsers": "^3",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^25.6.0",
     "@types/react": "^19",
