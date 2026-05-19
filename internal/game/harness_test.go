@@ -106,59 +106,65 @@ func TestConnect4Harness(t *testing.T) {
 }
 
 func TestTicTacToeAlwaysTerminates(t *testing.T) {
-	t.Run("AI vs AI always reaches terminal state", hegel.Case(func(ht *hegel.T) {
-		initialState := NewState(NewTicTacToeBoard())
-		session := &TicTacToeSession{}
-		ais := PlayerMap[Ai[Position, TicTacToeBoard]]{
-			P1: NewTicTacToeAi(),
-			P2: NewTicTacToeAi(),
-		}
+	t.Run("AI vs AI always reaches terminal state", func(t *testing.T) {
+		hegel.Test(t, func(ht *hegel.T) {
+			initialState := NewState(NewTicTacToeBoard())
+			session := &TicTacToeSession{}
+			ais := PlayerMap[Ai[Position, TicTacToeBoard]]{
+				P1: NewTicTacToeAi(),
+				P2: NewTicTacToeAi(),
+			}
 
-		finalState, err := RunGame(initialState, session, ais)
-		if err != nil {
-			ht.Fatalf("game returned error: %v", err)
-		}
-		if !finalState.Status.In(P1Win, P2Win, Draw) {
-			ht.Fatalf("unexpected terminal status: %v", finalState.Status)
-		}
-	}))
+			finalState, err := RunGame(initialState, session, ais)
+			if err != nil {
+				ht.Fatalf("game returned error: %v", err)
+			}
+			if !finalState.Status.In(P1Win, P2Win, Draw) {
+				ht.Fatalf("unexpected terminal status: %v", finalState.Status)
+			}
+		})
+	})
 }
 
 func TestConnect4AlwaysTerminates(t *testing.T) {
-	t.Run("AI vs AI always reaches terminal state", hegel.Case(func(ht *hegel.T) {
-		initialState := NewState(NewConnect4Board())
-		session := &Connect4Session{}
-		ais := PlayerMap[Ai[int, Connect4Board]]{
-			P1: NewConnect4Ai(),
-			P2: NewConnect4Ai(),
-		}
+	t.Run("AI vs AI always reaches terminal state", func(t *testing.T) {
+		hegel.Test(t, func(ht *hegel.T) {
+			initialState := NewState(NewConnect4Board())
+			session := &Connect4Session{}
+			ais := PlayerMap[Ai[int, Connect4Board]]{
+				P1: NewConnect4Ai(),
+				P2: NewConnect4Ai(),
+			}
 
-		finalState, err := RunGame(initialState, session, ais)
-		if err != nil {
-			ht.Fatalf("game returned error: %v", err)
-		}
-		if !finalState.Status.In(P1Win, P2Win, Draw) {
-			ht.Fatalf("unexpected terminal status: %v", finalState.Status)
-		}
-	}))
+			finalState, err := RunGame(initialState, session, ais)
+			if err != nil {
+				ht.Fatalf("game returned error: %v", err)
+			}
+			if !finalState.Status.In(P1Win, P2Win, Draw) {
+				ht.Fatalf("unexpected terminal status: %v", finalState.Status)
+			}
+		})
+	})
 }
 
 func TestBattleshipAlwaysTerminates(t *testing.T) {
-	t.Run("AI vs AI always reaches terminal state", hegel.Case(func(ht *hegel.T) {
-		initialState := NewState(NewBattleshipSharedState())
-		session := NewBattleshipSession()
-		ais := PlayerMap[Ai[BattleshipMove, BattleshipSharedState]]{
-			P1: NewBattleshipAi(),
-			P2: NewBattleshipAi(),
-		}
+	t.Run("AI vs AI always reaches terminal state", func(t *testing.T) {
+		hegel.Test(t, func(ht *hegel.T) {
+			initialState := NewState(NewBattleshipSharedState())
+			session := NewBattleshipSession()
+			ais := PlayerMap[Ai[BattleshipMove, BattleshipSharedState]]{
+				P1: NewBattleshipAi(),
+				P2: NewBattleshipAi(),
+			}
 
-		finalState, err := RunGame(initialState, session, ais)
-		if err != nil {
-			ht.Fatalf("game returned error: %v", err)
-		}
-		// Battleship always has a winner (no draws)
-		if !finalState.Status.In(P1Win, P2Win) {
-			ht.Fatalf("unexpected terminal status: %v", finalState.Status)
-		}
-	}))
+			finalState, err := RunGame(initialState, session, ais)
+			if err != nil {
+				ht.Fatalf("game returned error: %v", err)
+			}
+			// Battleship always has a winner (no draws)
+			if !finalState.Status.In(P1Win, P2Win) {
+				ht.Fatalf("unexpected terminal status: %v", finalState.Status)
+			}
+		})
+	})
 }
