@@ -118,8 +118,10 @@ func (p *Protocol[M, S]) makeMove(player game.Player, shared S, forceChaos bool)
 
 func (p *Protocol[M, S]) corruptMove(raw []byte) []byte {
 	if p.behavior.toMalformed(p.rng) {
-		// Deliberately malformed JSON.
-		return []byte(`{"evil":`)
+		// Well-formed JSON of the wrong type: it survives the server's
+		// json.RawMessage websocket decode but fails to unmarshal into the
+		// concrete move type, exercising the invalid-payload path.
+		return []byte(`"not-a-move"`)
 	}
 	// Valid JSON but often semantically nonsensical for concrete game move types.
 	if len(raw) > 0 && raw[0] == '[' {
