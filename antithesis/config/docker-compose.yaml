@@ -99,3 +99,43 @@ services:
         condition: service_healthy
       gameserver-2:
         condition: service_healthy
+
+  ui:
+    container_name: aardvark-arena-ui
+    hostname: aardvark-arena-ui
+    platform: linux/amd64
+    build:
+      context: ../..
+      dockerfile: antithesis/Dockerfile
+      target: ui
+    image: aardvark-arena-ui:latest
+    environment:
+      NO_COLOR: "1"
+    depends_on:
+      matchmaker:
+        condition: service_healthy
+      gameserver:
+        condition: service_healthy
+      gameserver-2:
+        condition: service_healthy
+
+  ui-workload:
+    container_name: aardvark-arena-ui-workload
+    hostname: aardvark-arena-ui-workload
+    platform: linux/amd64
+    build:
+      context: ../..
+      dockerfile: antithesis/Dockerfile
+      target: ui-workload
+    image: aardvark-arena-ui-workload:latest
+    environment:
+      NO_COLOR: "1"
+    depends_on:
+      ui:
+        condition: service_started
+      matchmaker:
+        condition: service_healthy
+      gameserver:
+        condition: service_healthy
+      gameserver-2:
+        condition: service_healthy
